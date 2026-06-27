@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quant AI — Logs & Pipeline Debug</title>
+<script src="/config.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #EDE9E3;
+    --panel:     #FFFFFF;
+    --panel-2:   #F5F1EC;
+    --border:    #D8D2CA;
+    --border-2:  #C8C0B6;
+    --text:      #1C1814;
+    --muted:     #8C8278;
+    --accent:    #E07A2A;
+    --accent-2:  #B85A10;
+    --accent-bg: #FEF3E8;
+    --buy:       #16a34a;
+    --sell:      #dc2626;
+    --hold:      #f59e0b;
+    --wait:      #6b7280;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  header .brand { display: flex; align-items: center; gap: 12px; }
+  header .logo {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--accent);
+    color: #fff; display: grid; place-items: center; font-weight: 900; font-size: 16px; font-family: monospace;
+  }
+  header h1 { font-size: 15px; font-weight: 700; }
+  header .sub { font-size: 12px; color: var(--muted); }
+  header .api-status { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+  header .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+  header .dot.ok  { background: var(--buy); }
+  header .dot.bad { background: var(--sell); }
+  header a.home {
+    font-size: 12px; color: var(--accent); text-decoration: none;
+    padding: 5px 12px; border: 1px solid var(--accent); border-radius: 6px;
+  }
+  header a.home:hover { background: var(--accent-bg); }
+
+  main { padding: 20px 28px 40px; max-width: 1600px; margin: 0 auto; }
+  h2 { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  p.lead { color: var(--muted); font-size: 13px; margin-bottom: 18px; }
+
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 600; vertical-align: middle;
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    margin-bottom: 14px;
+  }
+  .card h3 { font-size: 14px; font-weight: 700; margin-bottom: 10px; }
+
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  button {
+    background: var(--accent); color: #fff; border: 0;
+    padding: 7px 14px; border-radius: 7px; font-weight: 600;
+    font-size: 13px; cursor: pointer; font-family: inherit;
+  }
+  button:hover { background: var(--accent-2); }
+  button.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  button.secondary:hover { background: var(--border); }
+
+  select {
+    padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px;
+    font-family: inherit; font-size: 13px; background: var(--panel);
+  }
+
+  table {
+    width: 100%; border-collapse: collapse; font-size: 13px;
+  }
+  thead th {
+    text-align: left; padding: 8px 10px; color: var(--muted);
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border); font-weight: 600;
+  }
+  tbody td { padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: 0; }
+
+  .empty {
+    color: var(--muted); font-size: 13px; padding: 12px;
+    text-align: center; background: var(--panel-2); border-radius: 6px;
+  }
+
+  .status { font-size: 12px; }
+  .status.ok    { color: var(--buy); }
+  .status.error { color: var(--sell); }
+  .status.loading { color: var(--accent); }
+
+  .pill {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: 11px; font-weight: 700;
+  }
+  .pill.success   { background: #dcfce7; color: #166534; }
+  .pill.completed { background: #dcfce7; color: #166534; }
+  .pill.failed    { background: #fee2e2; color: #991b1b; }
+  .pill.started   { background: #fef3c7; color: #92400e; }
+  .pill.running   { background: #dbeafe; color: #1e40af; }
+  .pill.queued    { background: #e5e7eb; color: #374151; }
+  .pill.done      { background: #dcfce7; color: #166534; }
+  .pill.error     { background: #fee2e2; color: #991b1b; }
+
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--panel-2); padding: 2px 6px; border-radius: 4px;
+    font-size: 11px;
+  }
+  pre {
+    font-family: 'JetBrains Mono', monospace;
+    background: #0f172a; color: #e2e8f0;
+    padding: 10px; border-radius: 6px;
+    font-size: 11px; white-space: pre-wrap; word-break: break-all;
+    max-height: 300px; overflow: auto;
+  }
+  details summary { cursor: pointer; }
+
+  .stat-block {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--muted);
+  }
+  .stat-block b { color: var(--text); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo">Q</div>
+    <div>
+      <h1>Logs &amp; Pipeline Debug</h1>
+      <div class="sub">Pipeline failures · Agent logs · Recent runs · Discovery jobs</div>
+    </div>
+  </div>
+  <div class="row">
+    <div class="api-status">
+      <div class="dot" id="apiDot"></div>
+      <code id="apiUrl">—</code>
+    </div>
+    <a class="home" href="/evals">🧑‍⚖️ LLM Evals</a>
+    <a class="home" href="/">← Back to console</a>
+  </div>
+</header>
+
+<main>
+  <h2>Debug Console <span class="badge" style="background:#fee2e2;color:#991b1b">live</span></h2>
+  <p class="lead">Pipeline failures, agent logs, recent runs, MCP status. Auto-refreshes every 30 s.</p>
+
+  <!-- Controls bar -->
+  <div class="card">
+    <div class="row">
+      <button onclick="loadDebug()">↺ Refresh Now</button>
+      <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--muted)">
+        <input type="checkbox" id="dbgShowFailures"  checked onchange="renderDebugSections()"> Failures
+      </label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--muted)">
+        <input type="checkbox" id="dbgShowAgentLogs" checked onchange="renderDebugSections()"> Agent Logs
+      </label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--muted)">
+        <input type="checkbox" id="dbgShowRuns"      checked onchange="renderDebugSections()"> Runs
+      </label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--muted)">
+        <input type="checkbox" id="dbgShowJobs"      checked onchange="renderDebugSections()"> Jobs
+      </label>
+      <label style="display:flex;align-items:center;gap:5px;font-size:13px;color:var(--muted);margin-left:10px">
+        <input type="checkbox" id="dbgOnlyErrors" onchange="renderDebugSections()"> Errors only
+      </label>
+      <div style="display:flex;align-items:center;gap:6px;margin-left:auto;font-size:13px;color:var(--muted)">
+        Limit
+        <select id="errLimit">
+          <option value="50">50</option>
+          <option value="100" selected>100</option>
+          <option value="200">200</option>
+        </select>
+      </div>
+      <div class="status" id="errStatus"></div>
+    </div>
+  </div>
+
+  <div id="dbgSystemBar" style="display:none;margin-bottom:14px"></div>
+  <div id="dbgSectionFailures"></div>
+  <div id="dbgSectionAgentLogs"></div>
+  <div id="dbgSectionRuns"></div>
+  <div id="dbgSectionJobs"></div>
+</main>
+
+<script>
+  // Resolved from /config.js (window.__API_BASE__, set by PUBLIC_API_BASE_URL).
+  // Blank → same origin; localhost fallback for `file://` opens.
+  const API_BASE = (window.__API_BASE__ && window.__API_BASE__.trim())
+    ? window.__API_BASE__.replace(/\/$/, "")
+    : (window.location.origin.startsWith("file:") ? "http://localhost:8000" : window.location.origin);
+  document.getElementById("apiUrl").textContent = API_BASE;
+
+  let _dbgData = null;
+
+  function setStatus(id, cls, text) {
+    const el = document.getElementById(id);
+    el.className = "status " + (cls || "");
+    el.textContent = text;
+  }
+  function escapeHtml(s) {
+    return String(s ?? "")
+      .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+      .replaceAll('"',"&quot;").replaceAll("'","&#39;");
+  }
+  function _ago(iso) {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "—";
+    const s = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (s < 60)   return s + "s ago";
+    if (s < 3600) return Math.floor(s/60) + "m ago";
+    if (s < 86400) return Math.floor(s/3600) + "h ago";
+    return Math.floor(s/86400) + "d ago";
+  }
+  function _shortId(id) { return id ? String(id).substring(0,8) + "…" : "—"; }
+  function _statusPill(status) {
+    if (!status) return '<span class="pill queued">—</span>';
+    const cls = String(status).toLowerCase();
+    return `<span class="pill ${escapeHtml(cls)}">${escapeHtml(status)}</span>`;
+  }
+  function _dbgErrColor(t) {
+    if (!t) return "var(--muted)";
+    const x = String(t).toLowerCase();
+    if (x.includes("timeout") || x.includes("permission")) return "#b91c1c";
+    if (x.includes("value") || x.includes("key")) return "#92400e";
+    return "var(--sell)";
+  }
+  function _dbgErrBg(t) {
+    if (!t) return "";
+    return "#fff7ed";
+  }
+
+  // ── main fetch ─────────────────────────────────────────────
+  async function loadDebug() {
+    const limit = parseInt(document.getElementById("errLimit").value) || 100;
+    setStatus("errStatus", "loading", "Fetching debug snapshot…");
+    try {
+      const r = await fetch(`${API_BASE}/debug/summary?failures_limit=${limit}&agent_logs_limit=80`);
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.detail || "Failed to load debug summary");
+      _dbgData = data;
+      document.getElementById("apiDot").className = "dot ok";
+      const ts = data.generated_at ? new Date(data.generated_at).toLocaleTimeString() : "?";
+      setStatus("errStatus", "ok", `Updated ${ts} — auto-refresh every 30s`);
+      renderDebugSections();
+    } catch (e) {
+      document.getElementById("apiDot").className = "dot bad";
+      setStatus("errStatus", "error", e.message);
+      ["dbgSystemBar","dbgSectionFailures","dbgSectionAgentLogs","dbgSectionRuns","dbgSectionJobs"]
+        .forEach(id => { document.getElementById(id).innerHTML = ""; });
+    }
+  }
+
+  function renderDebugSections() {
+    if (!_dbgData) return;
+    const onlyErrors = document.getElementById("dbgOnlyErrors").checked;
+    renderDebugSystemBar(_dbgData);
+    if (document.getElementById("dbgShowFailures").checked)
+      renderDebugFailures(_dbgData.failures || [], onlyErrors);
+    else document.getElementById("dbgSectionFailures").innerHTML = "";
+    if (document.getElementById("dbgShowAgentLogs").checked)
+      renderDebugAgentLogs(_dbgData.agent_logs || [], onlyErrors);
+    else document.getElementById("dbgSectionAgentLogs").innerHTML = "";
+    if (document.getElementById("dbgShowRuns").checked)
+      renderDebugRuns(_dbgData.recent_runs || [], _dbgData.dispatch_state || {});
+    else document.getElementById("dbgSectionRuns").innerHTML = "";
+    if (document.getElementById("dbgShowJobs").checked)
+      renderDebugJobs(_dbgData.discovery_jobs || []);
+    else document.getElementById("dbgSectionJobs").innerHTML = "";
+  }
+
+  // ── system / MCP status bar ────────────────────────────────
+  function renderDebugSystemBar(data) {
+    const bar = document.getElementById("dbgSystemBar");
+    bar.style.display = "block";
+    const mcp = data.mcp || {};
+    const mcpOk = mcp.ok;
+    const mcpColor = mcpOk ? "var(--buy)" : "var(--sell)";
+    const mcpText = mcpOk ? "UP" : "DOWN";
+    const checkedAgo = mcp.checked_at ? _ago(new Date(mcp.checked_at * 1000).toISOString()) : "—";
+
+    const failCount = (data.failures || []).length;
+    const agentFail = (data.agent_logs || []).filter(l => l.status === "FAILED").length;
+    const runFail = (data.recent_runs || []).filter(r => r.status === "FAILED").length;
+
+    bar.innerHTML = `
+      <div class="card">
+        <div class="row" style="gap:18px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <div style="width:10px;height:10px;border-radius:50%;background:${mcpColor}"></div>
+            <span style="font-size:13px;font-weight:600">MCP Server</span>
+            <span style="font-size:12px;color:${mcpColor};font-weight:700">${mcpText}</span>
+            <span style="font-size:11px;color:var(--muted)">${escapeHtml(mcp.base_url || "")}</span>
+            <span style="font-size:11px;color:var(--muted)">checked ${checkedAgo}</span>
+            ${mcp.detail && !mcpOk ? `<span style="font-size:11px;color:var(--sell)">${escapeHtml(mcp.detail)}</span>` : ""}
+          </div>
+          <div class="stat-block">Pipeline failures: <b style="color:${failCount ? "var(--sell)" : "var(--buy)"}">${failCount}</b></div>
+          <div class="stat-block">Agent errors: <b style="color:${agentFail ? "var(--sell)" : "var(--buy)"}">${agentFail}</b></div>
+          <div class="stat-block">Failed runs: <b style="color:${runFail ? "var(--sell)" : "var(--buy)"}">${runFail}</b></div>
+          <button class="secondary" style="margin-left:auto;font-size:12px;padding:5px 12px"
+            onclick="window.open('${API_BASE}/mcp/health','_blank')">MCP Health JSON</button>
+          <button class="secondary" style="font-size:12px;padding:5px 12px"
+            onclick="window.open('${API_BASE}/api_keys/health','_blank')">API Keys</button>
+        </div>
+      </div>`;
+  }
+
+  // ── section: pipeline failures ─────────────────────────────
+  function renderDebugFailures(failures, onlyErrors) {
+    const el = document.getElementById("dbgSectionFailures");
+    const items = failures.slice().reverse();
+    if (!items.length) {
+      el.innerHTML = `<div class="card"><h3>Pipeline Failures (JSONL log)</h3><div class="empty">No failures logged. Backend writes to <code>qa_logs/failed_log.jsonl</code>.</div></div>`;
+      return;
+    }
+    const rows = items.map(f => {
+      const bg  = _dbgErrBg(f.error_type);
+      const col = _dbgErrColor(f.error_type);
+      const errShort = (f.error || "").substring(0, 140) + ((f.error||"").length > 140 ? "…" : "");
+      return `<tr style="background:${bg}">
+        <td style="font-size:11px;color:var(--muted);white-space:nowrap">${_ago(f.ts)}</td>
+        <td><code>${escapeHtml(f.feature||"—")}</code></td>
+        <td style="font-size:12px;color:var(--muted)">${escapeHtml(f.stage||"—")}</td>
+        <td style="font-size:12px;font-weight:700;color:${col}">${escapeHtml(f.error_type||"—")}</td>
+        <td style="font-size:12px;color:var(--muted)">${escapeHtml(f.symbol||"—")}</td>
+        <td style="font-size:11px;color:var(--muted)">${_shortId(f.run_id)}</td>
+        <td style="font-size:12px;max-width:340px">
+          <details>
+            <summary style="color:${col};font-size:12px;font-weight:500">${escapeHtml(errShort)}</summary>
+            <pre>${escapeHtml(f.error||"")}${f.traceback ? "\n\n── traceback ──\n" + f.traceback : ""}</pre>
+          </details>
+        </td>
+        <td style="font-size:12px;color:var(--muted)">${f.elapsed_sec != null ? f.elapsed_sec+"s" : "—"}</td>
+      </tr>`;
+    }).join("");
+    el.innerHTML = `
+      <div class="card" style="overflow-x:auto">
+        <h3>Pipeline Failures <span style="font-size:12px;color:var(--muted);font-weight:400">(${items.length} entries, newest first)</span></h3>
+        <table>
+          <thead><tr>
+            <th>When</th><th>Feature / Node</th><th>Stage</th><th>Error Type</th>
+            <th>Symbol</th><th>Run ID</th><th>Error Message</th><th>Elapsed</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
+  // ── section: agent logs from DB ────────────────────────────
+  function renderDebugAgentLogs(logs, onlyErrors) {
+    const el = document.getElementById("dbgSectionAgentLogs");
+    let items = logs;
+    if (onlyErrors) items = logs.filter(l => l.status === "FAILED" || l.error);
+    if (items[0] && items[0].error && String(items[0].error).startsWith("DB read failed")) {
+      el.innerHTML = `<div class="card"><h3>Agent Logs (DB)</h3><div class="empty" style="color:var(--sell)">${escapeHtml(items[0].error)}</div></div>`;
+      return;
+    }
+    if (!items.length) {
+      el.innerHTML = `<div class="card"><h3>Agent Logs (DB)</h3><div class="empty">No agent logs in DB${onlyErrors ? " (no errors)" : ""}.</div></div>`;
+      return;
+    }
+    const rows = items.map(l => {
+      const isFailed = l.status === "FAILED";
+      const rowBg = isFailed ? "#fef2f2" : "";
+      return `<tr style="${rowBg ? "background:" + rowBg : ""}">
+        <td style="font-size:11px;color:var(--muted);white-space:nowrap">${_ago(l.created_at)}</td>
+        <td style="font-size:12px;font-weight:600">${escapeHtml(l.agent_name||"—")}</td>
+        <td style="font-size:11px;color:var(--muted)">${escapeHtml(l.agent_type||"—")}</td>
+        <td>${_statusPill(l.status)}</td>
+        <td style="font-size:12px;color:var(--muted)">${escapeHtml(l.signal||"—")}</td>
+        <td style="font-size:11px;color:var(--muted)">${escapeHtml(l.model_used||"—")}</td>
+        <td style="font-size:12px;color:var(--muted)">${l.latency_ms != null ? Math.round(l.latency_ms)+"ms" : "—"}</td>
+        <td style="font-size:12px;color:var(--muted)">${l.tokens_input != null ? l.tokens_input + " / " + (l.tokens_output||0) : "—"}</td>
+        <td style="font-size:12px;color:var(--muted)">${l.cost_usd != null ? "$" + Number(l.cost_usd).toFixed(5) : "—"}</td>
+        <td style="font-size:11px;color:var(--muted)">${_shortId(l.run_id)}</td>
+        <td style="font-size:12px;max-width:260px">${l.error
+          ? `<details><summary style="color:var(--sell);font-size:12px">${escapeHtml((l.error||"").substring(0,80))}${(l.error||"").length>80?"…":""}</summary><pre>${escapeHtml(l.error)}</pre></details>`
+          : '<span style="color:var(--buy);font-size:11px">✓</span>'}</td>
+      </tr>`;
+    }).join("");
+    el.innerHTML = `
+      <div class="card" style="overflow-x:auto">
+        <h3>Agent Logs (DB) <span style="font-size:12px;color:var(--muted);font-weight:400">(${items.length} rows)</span></h3>
+        <table>
+          <thead><tr>
+            <th>When</th><th>Agent</th><th>Type</th><th>Status</th><th>Signal</th><th>Model</th>
+            <th>Latency</th><th>Tokens in/out</th><th>Cost</th><th>Run ID</th><th>Error</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
+  // ── section: recent runs + dispatch state ──────────────────
+  function renderDebugRuns(runs, dispatchState) {
+    const el = document.getElementById("dbgSectionRuns");
+    if (!runs.length) {
+      el.innerHTML = `<div class="card"><h3>Recent Pipeline Runs (DB)</h3><div class="empty">No runs in DB.</div></div>`;
+      return;
+    }
+    const rows = runs.map(r => {
+      const isFailed = r.status === "FAILED";
+      const dsEntry = dispatchState[r.id];
+      let dispatchCell = "—";
+      if (dsEntry) {
+        const done = dsEntry.done || 0, total = dsEntry.total || 0, errs = dsEntry.errors || 0;
+        const pct = total ? Math.round(done / total * 100) : 0;
+        const color = dsEntry.complete ? "var(--buy)" : errs ? "var(--sell)" : "var(--accent)";
+        dispatchCell = `<span style="font-size:11px;color:${color}">${done}/${total} done${errs ? ", " + errs + " err" : ""} (${pct}%)</span>`;
+      }
+      return `<tr style="${isFailed ? "background:#fef2f2" : ""}">
+        <td style="font-size:11px;color:var(--muted);white-space:nowrap">${_ago(r.started_at)}</td>
+        <td><code>${_shortId(r.id)}</code></td>
+        <td style="font-size:12px">${escapeHtml(r.workflow_name||"—")}</td>
+        <td>${_statusPill(r.status)}</td>
+        <td style="font-size:12px;color:var(--muted)">${r.elapsed_sec != null ? r.elapsed_sec + "s" : "—"}</td>
+        <td>${dispatchCell}</td>
+      </tr>`;
+    }).join("");
+    el.innerHTML = `
+      <div class="card" style="overflow-x:auto">
+        <h3>Recent Pipeline Runs (DB) <span style="font-size:12px;color:var(--muted);font-weight:400">(${runs.length} rows)</span></h3>
+        <table>
+          <thead><tr>
+            <th>When</th><th>Run ID</th><th>Workflow</th><th>Status</th><th>Elapsed</th><th>F2 Dispatch</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
+  // ── section: discovery job queue ───────────────────────────
+  function renderDebugJobs(jobs) {
+    const el = document.getElementById("dbgSectionJobs");
+    if (!jobs.length) {
+      el.innerHTML = `<div class="card"><h3>Discovery Job Queue</h3><div class="empty">No jobs queued yet this session.</div></div>`;
+      return;
+    }
+    const rows = jobs.map(j => {
+      const isErr = j.status === "error";
+      return `<tr style="${isErr ? "background:#fef2f2" : ""}">
+        <td><code>${_shortId(j.job_id)}</code></td>
+        <td>${_statusPill(j.status)}</td>
+        <td style="font-size:11px;color:var(--muted);white-space:nowrap">${j.started_at ? _ago(new Date(j.started_at*1000).toISOString()) : "—"}</td>
+        <td style="font-size:12px;color:var(--muted)">${j.elapsed_sec != null ? j.elapsed_sec+"s" : "—"}</td>
+        <td style="font-size:12px;max-width:300px">${j.error
+          ? `<details><summary style="color:var(--sell);font-size:12px">${escapeHtml((j.error||"").substring(0,80))}</summary><pre>${escapeHtml(j.error)}</pre></details>`
+          : (j.status === "done" ? '<span style="color:var(--buy);font-size:12px">✓ completed</span>' : "—")}</td>
+      </tr>`;
+    }).join("");
+    el.innerHTML = `
+      <div class="card" style="overflow-x:auto">
+        <h3>Discovery Job Queue <span style="font-size:12px;color:var(--muted);font-weight:400">(in-memory, resets on restart)</span></h3>
+        <table>
+          <thead><tr>
+            <th>Job ID</th><th>Status</th><th>Started</th><th>Elapsed</th><th>Error / Result</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+  }
+
+  // ── bootstrap ──────────────────────────────────────────────
+  loadDebug();
+  setInterval(loadDebug, 30_000);
+</script>
+
+</body>
+</html>

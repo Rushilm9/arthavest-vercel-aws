@@ -1,0 +1,35 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Databases
+*.db
+*.sqlite3
+*.sqlite3-journal
+
+# Logs
+*.log
+mcp_stderr.log
+
+# VS Code / IDE settings
+.vscode/
+.idea/
+.DS_Store
+
+# Virtual env dependencies / local configs
+venv/
+.python-version
+
+# AWS deployment secrets and keys
+*.pem
+aws_secrets.txt

@@ -1,0 +1,44 @@
+# ==============================================================
+# Quant AI - Python Dependencies (Trimmed for Vertex AI Deployed Graph)
+# Install:  pip install -r requirements.txt
+# Python:   3.11+
+# ==============================================================
+
+# -- Core API --------------------------------------
+fastapi>=0.110.0
+uvicorn[standard]>=0.28.0
+pydantic>=2.6.3
+pydantic-settings>=2.2.1
+python-dotenv>=1.0.1
+email-validator>=2.0.0
+python-multipart>=0.0.9
+requests>=2.31.0
+httpx>=0.27.0
+rich>=13.7.1
+
+# -- Database (Supabase / Postgres) ----------------
+sqlalchemy>=2.0.29
+psycopg2-binary>=2.9.9
+
+# -- Auth ------------------------------------------
+bcrypt>=4.0.0
+
+# -- AI / LLM (Google Gemini via LangChain) --------
+langchain-google-genai>=2.0.0
+langchain-core>=0.3.0
+langgraph>=0.2.0
+langchain-google-vertexai>=1.0.0
+google-cloud-aiplatform[agent_engines]>=1.50.0
+
+# -- Data processing -------------------------------
+pandas>=2.2.0
+numpy>=1.24.0
+
+
+# -- Additional Data Utilities ---------------------
+yfinance>=0.2.38
+tradingview-screener>=2.4.0
+feedparser>=6.0.0          # RSS news fetch (market.py / news_service.py); without it news is skipped
+apscheduler>=3.10.0        # background scheduler (manual mode today, kept for future cron jobs)
+nltk>=3.8.1
+finvader>=0.1.0

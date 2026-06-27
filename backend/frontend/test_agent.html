@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agent Debugger Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/config.js"></script>
+    <style>
+        pre { white-space: pre-wrap; word-wrap: break-word; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+        .spinner { border: 4px solid rgba(255, 255, 255, 0.3); border-radius: 50%; border-top: 4px solid #3b82f6; width: 24px; height: 24px; animation: spin 1s linear infinite; display: inline-block; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .tab-btn.active { border-bottom: 2px solid #3b82f6; color: #60a5fa; }
+        #narrative-html ul { list-style: disc; padding-left: 1.5rem; }
+        #narrative-html li { margin-bottom: 0.5rem; line-height: 1.6; color: #d1d5db; }
+        #narrative-html strong { color: #fbbf24; font-weight: 700; }
+        #narrative-html b { color: #60a5fa; font-weight: 700; }
+        .score-bar { height: 8px; border-radius: 4px; background: #1f2937; overflow: hidden; }
+        .score-fill { height: 100%; border-radius: 4px; transition: width 0.6s ease; }
+        .step-detail code { background: #1e293b; color: #67e8f9; padding: 1px 5px; border-radius: 3px; font-size: 0.7rem; }
+        .step-detail b { color: #60a5fa; }
+    </style>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen font-sans flex flex-col">
+    <!-- Header -->
+    <header class="bg-gray-900 border-b border-gray-800 px-6 py-4 flex justify-between items-center">
+        <h1 class="text-2xl font-bold text-blue-400 flex items-center gap-2">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"></path></svg>
+            Agent Debugger Studio
+        </h1>
+        <button id="healthBtn" class="text-sm bg-gray-800 hover:bg-gray-700 border border-gray-600 text-gray-300 py-1.5 px-4 rounded transition-colors flex items-center gap-2">
+            <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            Test API Keys
+        </button>
+    </header>
+
+    <!-- Health Modal -->
+    <div id="healthModal" class="hidden fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+        <div class="bg-gray-900 border border-gray-700 rounded-lg shadow-xl max-w-2xl w-full flex flex-col">
+            <div class="p-4 border-b border-gray-800 flex justify-between items-center">
+                <h2 class="text-lg font-bold text-white">System Diagnostics</h2>
+                <button id="closeModalBtn" class="text-gray-400 hover:text-white text-xl">&times;</button>
+            </div>
+            <div class="p-4 overflow-y-auto max-h-96">
+                <pre id="healthData" class="text-sm text-green-300 font-mono"></pre>
+            </div>
+        </div>
+    </div>
+
+    <div class="flex-1 flex overflow-hidden">
+        <!-- Left Panel -->
+        <div class="w-1/3 bg-gray-900 border-r border-gray-800 p-6 flex flex-col overflow-y-auto">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Stock Symbol</label>
+                    <div class="relative">
+                        <input type="text" id="symbol" value="RELIANCE.NS" class="w-full bg-gray-800 text-white border border-gray-700 rounded px-3 py-2 focus:outline-none focus:border-blue-500 transition-colors" autocomplete="off">
+                        <div id="suggestions" class="hidden absolute left-0 right-0 mt-1 bg-gray-950 border border-gray-700 rounded shadow-xl max-h-60 overflow-y-auto z-50"></div>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Agent to Debug</label>
+                    <select id="agent" class="w-full bg-gray-800 text-white border border-gray-700 rounded px-3 py-2 focus:outline-none focus:border-blue-500 transition-colors">
+                        <option value="technical">Technical Agent (SMC & Indicators)</option>
+                        <option value="chart_pattern">Chart Pattern Agent (Visuals)</option>
+                        <option value="fundamental">Fundamental Agent</option>
+                        <option value="sentiment">Sentiment Agent</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-1">Time Horizon</label>
+                    <select id="horizon" class="w-full bg-gray-800 text-white border border-gray-700 rounded px-3 py-2 focus:outline-none focus:border-blue-500 transition-colors">
+                        <option value="MID">MID (1-3 Months)</option>
+                        <option value="SHORT">SHORT (Days-Weeks)</option>
+                        <option value="LONG">LONG (3+ Months)</option>
+                    </select>
+                </div>
+
+                <div class="border-t border-gray-800 pt-3">
+                    <label class="block text-xs uppercase tracking-wider text-gray-500 font-bold mb-1.5">LLM Model / Tier Override</label>
+                    <select id="customModel" class="w-full bg-gray-800 text-white border border-gray-700 rounded px-3 py-2 focus:outline-none focus:border-blue-500 transition-colors">
+                        <option value="">Default (Tier Config)</option>
+                        <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite (Verified Free)</option>
+                        <option value="gemini-2.5-flash">Gemini 2.5 Flash (Stable Fallback)</option>
+                        <option value="CUSTOM">Custom Model ID...</option>
+                    </select>
+                    <input type="text" id="customModelInput" placeholder="e.g. gemini-2.5-pro" class="hidden w-full mt-2 bg-gray-800 text-white border border-gray-700 rounded px-3 py-2 focus:outline-none focus:border-blue-500 transition-colors">
+                </div>
+
+                <div>
+                    <label class="block text-xs uppercase tracking-wider text-gray-500 font-bold mb-1.5">LLM API Key Source</label>
+                    <select id="apiKeyOption" class="w-full bg-gray-800 text-white border border-gray-700 rounded px-3 py-2 focus:outline-none focus:border-blue-500 transition-colors">
+                        <option value="">Default (From .env file)</option>
+                        <option value="GOOGLE_KEY_1">GOOGLE_API_KEY_1 (Key 1)</option>
+                        <option value="GOOGLE_KEY_2">GOOGLE_API_KEY_2 (Key 2)</option>
+                        <option value="GOOGLE_KEY_3">GOOGLE_API_KEY_3 (Key 3)</option>
+                        <option value="PASTE">Paste Custom Key...</option>
+                    </select>
+                    <input type="password" id="customApiKeyInput" placeholder="Paste custom key here" class="hidden w-full mt-2 bg-gray-800 text-white border border-gray-700 rounded px-3 py-2 focus:outline-none focus:border-blue-500 transition-colors">
+                </div>
+
+                <button id="runBtn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded shadow-lg transition duration-200 flex items-center justify-center mt-2">
+                    <span id="btnText">Execute Agent</span>
+                    <span id="spinner" class="spinner ml-3 hidden"></span>
+                </button>
+                <div id="errorContainer" class="hidden mt-2 bg-red-900/40 border border-red-500/50 rounded p-3 text-red-300 text-sm">
+                    <p id="errorMsg" class="font-mono break-all"></p>
+                </div>
+            </div>
+
+            <!-- Architecture & Flow (always visible, updates on agent change) -->
+            <div class="mt-6 pt-6 border-t border-gray-800 flex-1">
+                <h3 class="text-xs uppercase tracking-widest text-gray-500 font-bold mb-3 flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    How This Agent Works
+                </h3>
+                <div id="agentFlowInfo" class="text-xs text-gray-400 leading-relaxed space-y-2"></div>
+            </div>
+        </div>
+
+        <!-- Right Panel -->
+        <div class="w-2/3 bg-gray-950 flex flex-col relative">
+            <!-- Empty State -->
+            <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center text-gray-600">
+                <svg class="w-16 h-16 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                <p class="text-lg">Run an agent to see execution traces.</p>
+            </div>
+
+            <!-- Results -->
+            <div id="resultsView" class="hidden flex-col h-full">
+                <!-- Status Bar -->
+                <div class="bg-gray-800 px-4 py-2 border-b border-gray-700 flex justify-between items-center text-sm">
+                    <div class="flex items-center gap-3">
+                        <span id="resAgent" class="font-bold text-white uppercase tracking-wider"></span>
+                        <span id="resSymbol" class="bg-gray-700 px-2 py-0.5 rounded text-gray-300"></span>
+                        <span id="resHorizon" class="bg-gray-700 px-2 py-0.5 rounded text-gray-300"></span>
+                        <span id="resModel" class="border border-indigo-500/50 bg-indigo-900/30 px-2 py-0.5 rounded text-indigo-300 font-mono ml-4"></span>
+                        <span id="resTimestamp" class="text-xs text-gray-400 font-mono ml-2"></span>
+                    </div>
+                    <div class="text-gray-400 font-mono" id="resTime"></div>
+                </div>
+
+                <!-- Tabs -->
+                <div class="flex border-b border-gray-800 bg-gray-900 px-4">
+                    <button class="tab-btn active px-4 py-3 text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors" data-tab="tab-rendered">Rendered Output</button>
+                    <button class="tab-btn px-4 py-3 text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors" data-tab="tab-json">Raw JSON</button>
+                    <button class="tab-btn px-4 py-3 text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors" data-tab="tab-raw-llm">Raw LLM Text</button>
+                    <button class="tab-btn px-4 py-3 text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors" data-tab="tab-prompt">Prompt Sent</button>
+                    <button class="tab-btn px-4 py-3 text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors" data-tab="tab-data">Input Data</button>
+                    <button class="tab-btn px-4 py-3 text-sm font-medium text-gray-400 hover:text-gray-200 transition-colors" data-tab="tab-arch">Architecture</button>
+                </div>
+
+                <!-- Tab Contents -->
+                <div class="flex-1 overflow-y-auto p-4">
+                    <!-- Rendered Output -->
+                    <div id="tab-rendered" class="tab-content active">
+                        <div class="flex gap-4 mb-6">
+                            <div id="signalCard" class="flex-1 bg-gray-900 border border-gray-800 rounded-lg p-5 text-center">
+                                <p class="text-xs uppercase tracking-widest text-gray-500 mb-1">Signal</p>
+                                <p id="signalText" class="text-4xl font-black tracking-wide">—</p>
+                            </div>
+                            <div class="flex-1 bg-gray-900 border border-gray-800 rounded-lg p-5 text-center">
+                                <p class="text-xs uppercase tracking-widest text-gray-500 mb-1">Confidence</p>
+                                <p id="confText" class="text-4xl font-black text-white">—</p>
+                                <div class="score-bar mt-2"><div id="confBar" class="score-fill bg-blue-500" style="width:0%"></div></div>
+                            </div>
+                            <div class="flex-1 bg-gray-900 border border-gray-800 rounded-lg p-5 text-center">
+                                <p class="text-xs uppercase tracking-widest text-gray-500 mb-1">Trend</p>
+                                <p id="trendText" class="text-2xl font-bold text-gray-300">—</p>
+                            </div>
+                        </div>
+                        <div class="bg-gray-900 border border-gray-800 rounded-lg p-5 mb-6">
+                            <h3 class="text-xs uppercase tracking-widest text-gray-500 font-bold mb-3">Narrative</h3>
+                            <div id="narrative-html" class="text-sm leading-relaxed"></div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
+                                <h3 class="text-xs uppercase tracking-widest text-gray-500 font-bold mb-3">Key Levels</h3>
+                                <table class="w-full text-sm"><tbody id="keyLevelsBody"></tbody></table>
+                            </div>
+                            <div class="bg-gray-900 border border-gray-800 rounded-lg p-5">
+                                <h3 class="text-xs uppercase tracking-widest text-gray-500 font-bold mb-3">Sub-Scores</h3>
+                                <div id="subScoresContainer" class="space-y-3"></div>
+                            </div>
+                        </div>
+                        <div id="patternsSection" class="hidden bg-gray-900 border border-gray-800 rounded-lg p-5 mb-6">
+                            <h3 class="text-xs uppercase tracking-widest text-gray-500 font-bold mb-3">Patterns Detected</h3>
+                            <div id="patternsContainer" class="flex flex-wrap gap-2"></div>
+                        </div>
+                    </div>
+                    <!-- Raw JSON -->
+                    <div id="tab-json" class="tab-content">
+                        <h3 class="text-xs uppercase tracking-wider text-gray-500 font-bold mb-2">Full Agent Output (JSON)</h3>
+                        <pre id="content-json" class="text-sm text-green-400 bg-gray-900 p-4 rounded-lg border border-gray-800"></pre>
+                    </div>
+                    <!-- Raw LLM Text -->
+                    <div id="tab-raw-llm" class="tab-content">
+                        <h3 class="text-xs uppercase tracking-wider text-gray-500 font-bold mb-2">Exact String from Gemini</h3>
+                        <pre id="content-raw-llm" class="text-sm text-gray-300 bg-gray-900 p-4 rounded-lg border border-gray-800 whitespace-pre-wrap"></pre>
+                    </div>
+                    <!-- Prompt Sent -->
+                    <div id="tab-prompt" class="tab-content">
+                        <h3 class="text-xs uppercase tracking-wider text-gray-500 font-bold mb-2">Constructed Prompt</h3>
+                        <pre id="content-prompt" class="text-sm text-blue-300 bg-gray-900 p-4 rounded-lg border border-gray-800 whitespace-pre-wrap"></pre>
+                    </div>
+                    <!-- Input Data -->
+                    <div id="tab-data" class="tab-content">
+                        <h3 class="text-xs uppercase tracking-wider text-gray-500 font-bold mb-2">Raw Data from Tools</h3>
+                        <pre id="content-data" class="text-sm text-yellow-300 bg-gray-900 p-4 rounded-lg border border-gray-800"></pre>
+                    </div>
+                    <!-- Architecture -->
+                    <div id="tab-arch" class="tab-content">
+                        <div id="archContent" class="space-y-6"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const baseUrl = window.__API_BASE__ || "";
+
+        // ══════════════════════════════════════════════════════
+        //  AGENT ARCHITECTURE DATA
+        // ══════════════════════════════════════════════════════
+        const AGENT_ARCH = {
+            technical: {
+                title: 'Technical Analysis Agent',
+                oneLiner: 'Fetches live indicators from MCP/TradingView + 3Y OHLCV, computes derived metrics in Python, then asks Gemini to interpret them into a trading signal.',
+                flowSteps: [
+                    {
+                        icon: '📡', label: 'Step 1 — Live Indicators via MCP',
+                        detail: `Calls <code>mcp_safe("market.get_indicators", {symbol})</code>.<br>
+                        Returns: <b>close/price, ATR, EMA20, EMA50, EMA200, RSI, RSI7, MACD, ADX, Stoch.K, Stoch.D, CCI, Momentum, BB.upper, BB.lower, VWAP, Perf.W, Perf.1M, Perf.3M, Perf.6M, Perf.Y</b>.<br>
+                        <span class="text-yellow-400">Fallback:</span> If MCP fails → calls <code>get_stock_fundamentals(symbol)</code> which hits the <b>TradingView Screener API</b> for the same fields.`
+                    },
+                    {
+                        icon: '📊', label: 'Step 2 — Horizon-Tuned OHLCV for Pivots & 52W',
+                        detail: `Calls <code>mcp_safe("market.get_ohlcv", {symbol, period})</code> where <b>period is tuned by horizon</b> (SHORT=1y, MID=2y, LONG=3y; floored at 1y so 52W high/low & ema200 stay valid).<br>
+                        Pivot window & return lookback also scale with horizon (SHORT 20d/30d, MID 60d/90d, LONG 120d/180d).<br>
+                        <span class="text-yellow-400">Fallback:</span> If MCP fails → calls <code>yfinance.download(symbol, period=<horizon>)</code>.<br>
+                        <b>Used for:</b><br>
+                        • 52-week High/Low (max/min of last 365 days)<br>
+                        • Distance from 52W high (%)<br>
+                        • Support levels via <code>_compute_support_levels(ohlcv)</code><br>
+                        • Resistance levels via <code>_compute_resistance_levels(ohlcv)</code><br>
+                        • Stock 3-month return (close[today] vs close[90d ago])<br>
+                        • <span class="text-yellow-400">Indicator fallbacks:</span> If Step 1 returned None for RSI/EMA/ATR, they are <b>recomputed from OHLCV</b> (RSI from 14-day gain/loss, EMAs from ewm(), ATR from True Range).`
+                    },
+                    {
+                        icon: '📈', label: 'Step 3 — Nifty Relative Strength',
+                        detail: `Calls <code>mcp_safe("market.get_ohlcv", {symbol: "NIFTY", period: "1y"})</code>.<br>
+                        <span class="text-yellow-400">Fallback:</span> <code>yfinance.download("^NSEI", period="1y")</code>.<br>
+                        Computes Nifty 3-month return and classifies relative strength:<br>
+                        • diff > 5% → <b>OUTPERFORMING</b><br>
+                        • diff < -5% → <b>UNDERPERFORMING</b><br>
+                        • else → <b>IN LINE</b>`
+                    },
+                    {
+                        icon: '🧮', label: 'Step 4 — Python Derivations (no LLM)',
+                        detail: `Pure Python post-processing:<br>
+                        • <b>price_vs_ema20/50/200</b>: simple ABOVE/BELOW comparison<br>
+                        • <b>NaN/Inf sanitization</b>: any NaN or Inf values are replaced with null<br>
+                        • All numbers are rounded to 2 decimal places`
+                    },
+                    {
+                        icon: '📝', label: 'Step 5 — Prompt Construction',
+                        detail: `Injects all ~30 pre-computed values into the <code>TECHNICAL_NARRATIVE_PROMPT</code> template.<br>
+                        <b>Key rule:</b> The LLM is explicitly <b>forbidden from computing any math</b>. It only interprets.<br>
+                        Prompt asks for: 5-8 HTML bullet points, signal, confidence, key_levels, sub_scores.`
+                    },
+                    {
+                        icon: '🤖', label: 'Step 6 — LLM Call (Gemini Flash)',
+                        detail: `Uses <code>ModelTier.FLASH</code> (cheapest/fastest).<br>
+                        Returns strict JSON: <code>{signal, confidence, narrative, key_levels, sub_scores}</code>.<br>
+                        Logged via <code>log_llm_invocation()</code> for cost tracking.`
+                    },
+                    {
+                        icon: '✅', label: 'Step 7 — Parse & Validate',
+                        detail: `Strips markdown code fences, parses JSON.<br>
+                        • Signal validated: must be BUY/SELL/HOLD (defaults to HOLD)<br>
+                        • Confidence clamped to [0.0, 1.0]; if > 1 assumes it's a percentage and divides by 100<br>
+                        • <span class="text-yellow-400">Fallback:</span> On JSON parse failure, scans raw text for "BUY"/"SELL"/"HOLD" keywords`
+                    },
+                ],
+                concepts: [
+                    { q: 'What exact indicators does it use?', a: '<b>Trend:</b> EMA 20/50/200, Price vs EMA relationship. <b>Momentum:</b> RSI (7 & 14), MACD, ADX, Stochastic K/D, CCI (20), Momentum. <b>Volatility:</b> Bollinger Bands (upper/lower), VWAP, ATR (14). <b>Performance:</b> 1W/1M/3M/6M/1Y returns. <b>Context:</b> 52W High/Low, Support/Resistance pivots, Nifty relative strength.' },
+                    { q: 'How is Support/Resistance calculated?', a: 'From 3-year daily OHLCV using <code>_compute_resistance_levels()</code> and <code>_compute_support_levels()</code>. These use rolling max of Highs and rolling min of Lows as pivot levels.' },
+                    { q: 'What are the sub_scores?', a: '<b>short_term_momentum</b> (0-100): 5/10/20-day momentum + RSI/Stochastic + breakout proximity.<br><b>weekly_structure</b> (0-100): weekly higher-highs/higher-lows + EMA50/200 alignment.<br><b>intraday_breakout</b> (0-100): price vs VWAP, distance from 52W high, volume spike on last session.' },
+                    { q: 'Does the LLM compute any numbers?', a: '<b>No.</b> All math (RSI, EMA, ATR, support/resistance, performance) is done in Python tools.py. The LLM receives pre-computed numbers and only writes an interpretation narrative.' },
+                    { q: 'What model tier is used?', a: '<code>ModelTier.FLASH</code> — the cheapest/fastest tier. The prompt is structured and constrained enough that a flash model is sufficient for accurate interpretation.' },
+                    { q: 'What happens if data fetch fails?', a: 'The agent <b>re-raises the exception</b> — it does NOT silently return HOLD/0.5. LangGraph\'s RetryPolicy retries up to 3 times before the F2 run hard-fails.' },
+                ],
+                dataSources: [
+                    { source: 'MCP market.get_indicators', provides: 'RSI, MACD, EMA, Stoch, CCI, ADX, ATR, BB, VWAP, Perf', fallback: 'TradingView Screener API' },
+                    { source: 'MCP market.get_ohlcv (3y)', provides: '52W High/Low, Support/Resistance, 3M return, indicator fallbacks', fallback: 'yfinance.download()' },
+                    { source: 'MCP market.get_ohlcv (NIFTY 1y)', provides: 'Nifty 3M return for relative strength', fallback: 'yfinance ^NSEI' },
+                ],
+                knownIssues: [
+                    'Support/Resistance uses rolling max/min which produces duplicate plateau values instead of true local swing peaks.',
+                    'Volume data is NOT passed to the LLM — sub_scores mention "volume spike" but no volume metric is explicitly provided.',
+                    'RSI7 is not recomputed from OHLCV if MCP fails — only RSI14 has an OHLCV fallback.',
+                ],
+                fieldMapping: [
+                    { field: 'current_price', primary: 'MCP `market.get_indicators` ("close")', provider: 'TradingView Screener API', fallback: 'Local TV Screener API scraper ➔ Last Close in 3Y OHLCV (MCP/yfinance)' },
+                    { field: 'atr', primary: 'MCP `market.get_indicators` ("ATR")', provider: 'TradingView Screener API', fallback: 'Local TV Screener API scraper ➔ Calculated in Python (rolling 14-day True Range)' },
+                    { field: 'ema20, ema50, ema200', primary: 'MCP `market.get_indicators` ("EMA20/50/200")', provider: 'TradingView Screener API', fallback: 'Local TV Screener API scraper ➔ Computed in Python via rolling ewm(span=N) of 3Y Close' },
+                    { field: 'rsi, rsi7', primary: 'MCP `market.get_indicators` ("RSI", "RSI7")', provider: 'TradingView Screener API', fallback: 'Local TV Screener API scraper ➔ Computed in Python (14d Close gain/loss ratios)' },
+                    { field: 'macd', primary: 'MCP `market.get_indicators` ("MACD")', provider: 'TradingView Screener API', fallback: 'Local TV Screener API scraper ➔ None' },
+                    { field: 'adx', primary: 'MCP `market.get_indicators` ("ADX")', provider: 'TradingView Screener API', fallback: 'Local TV Screener API scraper ➔ None' },
+                    { field: 'stoch_k, stoch_d', primary: 'MCP `market.get_indicators` ("Stoch.K/D")', provider: 'TradingView Screener API', fallback: 'Local TV Screener API scraper ➔ None' },
+                    { field: 'cci, momentum', primary: 'MCP `market.get_indicators` ("CCI", "Mom")', provider: 'TradingView Screener API', fallback: 'Local TV Screener API scraper ➔ None' },
+                    { field: 'bb_upper, bb_lower', primary: 'MCP `market.get_indicators` ("BB.upper/lower")', provider: 'TradingView Screener API', fallback: 'Local TV Screener API scraper ➔ None' },
+                    { field: 'vwap', primary: 'MCP `market.get_indicators` ("VWAP")', provider: 'TradingView Screener API', fallback: 'Local TV Screener API scraper ➔ None' },
+                    { field: 'perf_w, perf_1m, perf_3m, perf_6m, perf_y', primary: 'MCP `market.get_indicators` ("Perf.W", etc.)', provider: 'TradingView Screener API', fallback: 'Local TV Screener API scraper ➔ None' },
+                    { field: 'high_52w, low_52w', primary: 'Computed in Python from 3Y daily OHLCV index', provider: 'ArthaVest Engine (Python)', fallback: 'Calculated using yfinance OHLCV fallback data' },
+                    { field: 'support_levels, resistance_levels', primary: 'Computed in Python (60-day rolling min of Lows / max of Highs + 1% zone clustering)', provider: 'ArthaVest Engine (Python)', fallback: 'Calculated using yfinance OHLCV fallback data' },
+                    { field: 'stock_3m_return', primary: 'Computed in Python: (Close[today] - Close[90d]) / Close[90d] * 100', provider: 'ArthaVest Engine (Python)', fallback: 'Calculated using yfinance OHLCV fallback data' },
+                    { field: 'nifty_3m_return', primary: 'MCP `market.get_ohlcv` ("NIFTY", period="1y")', provider: 'Nifty 50 Index (MCP)', fallback: 'yfinance.download("^NSEI", period="6mo")' },
+                    { field: 'relative_strength', primary: 'Computed in Python: stock_3m_return - nifty_3m_return', provider: 'ArthaVest Engine (Python)', fallback: 'Calculated using yfinance / ^NSEI fallback returns' }
+                ]
+            },
+            chart_pattern: {
+                title: 'Chart Pattern Agent',
+                oneLiner: 'Fetches 3Y OHLCV from yfinance, detects swing highs/lows and candlestick shapes in Python, then asks Gemini to name classical chart patterns.',
+                flowSteps: [
+                    {
+                        icon: '📡', label: 'Step 1 — Horizon-Tuned OHLCV Fetch (yfinance only)',
+                        detail: `Calls <code>get_ohlcv_3y(symbol, period)</code> with a <b>horizon-tuned period</b> (SHORT=6mo, MID=1y, LONG=3y) → <code>yfinance.download(symbol, period)</code>.<br>
+                        Swing-detection window also scales with horizon (SHORT=5, MID=10, LONG=20).<br>
+                        <b>No MCP is used for this agent</b> — it only uses yfinance.<br>
+                        Returns a DataFrame with columns: Open, High, Low, Close, Volume.<br>
+                        Rows with NaN Close are dropped.`
+                    },
+                    {
+                        icon: '🔍', label: 'Step 2 — Swing High/Low Detection',
+                        detail: `<code>_swings(df, window=10)</code>:<br>
+                        • Computes <code>df["High"].rolling(10).max()</code> over the last 40 bars<br>
+                        • Computes <code>df["Low"].rolling(10).min()</code> over the last 40 bars<br>
+                        • Takes the last 5 values as "recent swing highs" and "recent swing lows"<br>
+                        <span class="text-yellow-400">⚠ Note:</span> This is a rolling max, NOT true local peak detection. Can produce flat plateaus of the same value.`
+                    },
+                    {
+                        icon: '🕯️', label: 'Step 3 — Candlestick Tagging (last 3 candles)',
+                        detail: `<code>_candle_tags(df)</code> classifies the last 3 candles using body/wick ratios:<br>
+                        • <b>Doji</b>: body < 10% of total range (indecision)<br>
+                        • <b>Hammer</b>: lower wick > 2× body AND upper wick < body (reversal up)<br>
+                        • <b>Shooting Star</b>: upper wick > 2× body AND lower wick < body (reversal down)<br>
+                        • <b>Bull Marubozu</b>: close > open AND body > 60% of range (strong buy)<br>
+                        • <b>Bear Marubozu</b>: close < open AND body > 60% of range (strong sell)<br>
+                        <span class="text-yellow-400">⚠ Note:</span> Candles that don't match any pattern are silently skipped — temporal position is lost.`
+                    },
+                    {
+                        icon: '📅', label: 'Step 4 — Weekly Aggregation',
+                        detail: `Resamples daily Close to weekly bars using <code>df["Close"].resample("W").last()</code>.<br>
+                        Extracts: <b>weekly_close</b> (last week's close) and <b>weekly_change_8w_pct</b> (% change over 8 weeks).<br>
+                        Used for longer-horizon pattern context (MID/LONG).`
+                    },
+                    {
+                        icon: '📊', label: 'Step 5 — 52-Week Context',
+                        detail: `From the OHLCV data:<br>
+                        • <b>high_52w</b>: max of High column over last 365 days<br>
+                        • <b>low_52w</b>: min of Low column over last 365 days<br>
+                        • <b>dist_from_high_pct</b>: ((current_price - high_52w) / high_52w) × 100<br>
+                        • <b>dist_from_low_pct</b>: ((current_price - low_52w) / low_52w) × 100`
+                    },
+                    {
+                        icon: '📝', label: 'Step 6 — Horizon-Tuned Prompt',
+                        detail: `Injects all structural data into <code>CHART_PATTERN_PROMPT</code>.<br>
+                        Prompt is <b>horizon-tuned</b>:<br>
+                        • <b>SHORT</b> → prioritize candlestick + intraday/breakout patterns<br>
+                        • <b>MID</b> → classical patterns on daily (cup-and-handle, flag, double bottom, H&S)<br>
+                        • <b>LONG</b> → weekly/monthly bases only (multi-year cup, accumulation base)`
+                    },
+                    {
+                        icon: '🤖', label: 'Step 7 — LLM Call (Gemini Flash)',
+                        detail: `Uses <code>ModelTier.FLASH</code>.<br>
+                        Returns strict JSON: <code>{signal, confidence, narrative, patterns_detected[], sub_scores}</code>.<br>
+                        The LLM names the patterns (e.g., "head_and_shoulders", "double_bottom") — Python only provides structural data.`
+                    },
+                ],
+                concepts: [
+                    { q: 'What patterns can it detect?', a: 'The LLM names them from structural data: <b>head-and-shoulders, cup-and-handle, double bottom/top, flag, pennant, ascending/descending triangle, doji, hammer, shooting star, engulfing, morning/evening star</b>, and more. Python only provides raw swings + candle tags.' },
+                    { q: 'How do swing highs/lows work?', a: 'Uses <code>rolling(10).max()</code> on the High column and <code>rolling(10).min()</code> on the Low column. This finds the highest high in each 10-bar window. The last 5 values from the most recent 40 bars are returned. This is a simple approximation — NOT true fractal-based swing detection.' },
+                    { q: 'What are the candlestick detection thresholds?', a: '<b>Doji</b>: |close - open| / (high - low) < 0.10. <b>Hammer</b>: lower_wick > 2 × body AND upper_wick < body. <b>Shooting Star</b>: upper_wick > 2 × body AND lower_wick < body. <b>Marubozu</b>: body > 0.60 × range.' },
+                    { q: 'How does horizon affect the analysis?', a: 'The prompt explicitly instructs the LLM: SHORT → candlestick + breakout patterns, MID → daily classical patterns (flag, H&S), LONG → weekly/monthly bases. The LLM adjusts which patterns it looks for based on this instruction.' },
+                    { q: 'What are the sub_scores?', a: '<b>intraday_breakout</b> (0-100), <b>weekly_structure</b> (0-100), <b>weekly_base</b> (0-100). All scored by the LLM based on the structural data provided.' },
+                ],
+                dataSources: [
+                    { source: 'yfinance.download(symbol, period="3y")', provides: '3Y daily OHLCV (Open, High, Low, Close, Volume)', fallback: 'None — yfinance is the only source' },
+                ],
+                knownIssues: [
+                    '_swings() uses rolling(10).max()/min() which returns the running maximum — NOT true local swing peaks. Swing highs can be a flat plateau of the same repeating value.',
+                    '_candle_tags() skips candles that don\'t match any pattern — temporal sequencing is lost (e.g. "none, hammer, doji" becomes "hammer, doji"). The LLM doesn\'t know which candle was which day.',
+                    '_candle_tags() does not handle NaN values in OHLC data, which can cause silent failures or incorrect classifications.',
+                    'No volume analysis is passed — the agent cannot detect volume-confirmed breakouts.',
+                ],
+                fieldMapping: [
+                    { field: 'daily_ohlcv (3 Years)', primary: 'yfinance.download(symbol, period="3y")', provider: 'Yahoo Finance API (Direct)', fallback: 'None (Hard Dependency)' },
+                    { field: 'swing_highs, swing_lows', primary: 'Computed in Python (rolling 10-bar max of Highs & rolling min of Lows over last 40 bars)', provider: 'ArthaVest Engine (Python)', fallback: 'N/A' },
+                    { field: 'candlestick_shapes (last 3)', primary: 'Classified in Python using body/wick ratios (Doji, Hammer, Shooting Star, Marubozu)', provider: 'ArthaVest Engine (Python)', fallback: 'N/A' },
+                    { field: 'weekly_close & 8w return', primary: 'Computed in Python: resample Close from daily to weekly ("W")', provider: 'ArthaVest Engine (Python)', fallback: 'N/A' },
+                    { field: 'high_52w & low_52w', primary: 'Computed in Python: max & min of High & Low columns over rolling 365 days', provider: 'ArthaVest Engine (Python)', fallback: 'N/A' },
+                    { field: 'detected_patterns', primary: 'Gemini 3.1 Flash-Lite AI interpretation of swing and candlestick structures', provider: 'Google Gemini API', fallback: 'N/A' }
+                ]
+            },
+            fundamental: {
+                title: 'Fundamental Agent',
+                oneLiner: 'Evaluates earnings, valuation ratios, and financial health via the MCP Server (which wraps TradingView Screener + yfinance), then asks Gemini to interpret them.',
+                flowSteps: [
+                    {
+                        icon: '📡', label: 'Step 1 — Fetch Core Fundamentals',
+                        detail: `Calls <code>mcp_safe("market.get_fundamentals", {symbol})</code>.<br>
+                        <b>MCP Backend:</b> TradingView Screener + yfinance.<br>
+                        <b>Expected Data Schema:</b> <code>{PE, PB, ROE, ROCE, ROA, margins, D/E, current_ratio, ...}</code>`
+                    },
+                    {
+                        icon: '🏢', label: 'Step 2 — Fetch Ownership Data',
+                        detail: `Calls <code>mcp_safe("market.get_ownership", {symbol})</code>.<br>
+                        <b>Expected Data Schema:</b> <code>{promoter_pct, institutional_pct}</code>`
+                    },
+                    {
+                        icon: '📄', label: 'Step 3 — Fetch Financial Statements',
+                        detail: `Calls <code>mcp_safe("market.get_financials", {symbol})</code>.<br>
+                        <b>Expected Data Schema:</b> <code>{income_stmt, balance_sheet, cashflow}</code><br>
+                        Extracts: Interest Coverage, Free Cash Flow. (If Interest Coverage is missing, it estimates it using Operating Margin / Debt-to-Equity).`
+                    },
+                    {
+                        icon: '🧮', label: 'Step 4 — Horizon-Weighted Python Scoring (No LLM)',
+                        detail: `Computes a base score (out of 40) using a <b>horizon-aware</b> weighted system. The raw metrics are the SAME for every horizon (company facts don't change with holding period) — but the <b>weights change by horizon</b> (see <code>horizon_params._FUNDAMENTAL_WEIGHTS</code>):<br>
+                        • <b>SHORT:</b> solvency (D/E, Interest Coverage) + valuation (P/E) dominate; growth/quality de-emphasised — fundamentals are a backstop for a days-weeks trade.<br>
+                        • <b>MID:</b> balanced — 3x Debt/Equity & Interest Coverage, 2x ROE & Revenue Growth, 1x rest.<br>
+                        • <b>LONG:</b> quality + growth + moat dominate — 3x ROE/Revenue Growth, 2–2.5x ROCE/Net Margin/Earnings Growth/Promoter.<br>
+                        Same numbers → different score → signal can flip per horizon.`
+                    },
+                    {
+                        icon: '🤖', label: 'Step 5 — LLM Call',
+                        detail: `Passes the flat JSON of metrics to the LLM to write the HTML narrative interpreting the valuation, growth, and financial health.`
+                    },
+                ],
+                concepts: [
+                    { q: 'Why do we use MCP here?', a: 'The MCP server consolidates data from TradingView and yfinance so the agent gets a unified JSON. If the MCP server is down, the agent fails over to its own local TradingView/yfinance fallback.' },
+                    { q: 'How is Interest Coverage estimated?', a: 'If missing from financial statements, it divides Operating Margin by Debt/Equity as a rough proxy. If Debt/Equity is 0, it caps at 99.0.' },
+                ],
+                dataSources: [
+                    { source: 'MCP: market.get_fundamentals', provides: '{PE, PB, ROE, ROCE, ROA, margins, D/E, current_ratio, ...}', fallback: 'Local TradingView + yfinance.info' },
+                    { source: 'MCP: market.get_ownership', provides: '{promoter_pct, institutional_pct}', fallback: 'Local yfinance.major_holders' },
+                    { source: 'MCP: market.get_financials', provides: '{income_stmt, balance_sheet, cashflow}', fallback: 'Local yfinance.financials' },
+                ],
+                knownIssues: [
+                    'yfinance frequently returns None for revenueGrowth, earningsGrowth, and debtToEquity for NSE stocks.',
+                    'The fundamental score defaults to 20.0 (HOLD) if completely empty, which can mask data-fetching failures.',
+                ],
+                fieldMapping: [
+                    { field: 'pe_ratio, price_to_book', primary: 'MCP `market.get_fundamentals` ("PE", "PB")', provider: 'TradingView Screener API', fallback: 'Local TV Screener API scraper ➔ yfinance `trailingPE` / `priceToBook`' },
+                    { field: 'roe, roce, roa', primary: 'MCP `market.get_fundamentals` ("ROE", "ROCE", "ROA")', provider: 'TradingView Screener API', fallback: 'Local TV Screener API scraper ➔ None (NSE stocks return null if TV fails)' },
+                    { field: 'net_margin, operating_margin', primary: 'MCP `market.get_fundamentals` ("net_margin", "operating_margin")', provider: 'TradingView Screener API', fallback: 'Local TV Screener API scraper ➔ None' },
+                    { field: 'debt_to_equity, current_ratio', primary: 'MCP `market.get_fundamentals` ("DE", "current_ratio")', provider: 'TradingView Screener API', fallback: 'Local TV Screener API scraper ➔ None' },
+                    { field: 'dividend_yield, market_cap', primary: 'MCP `market.get_fundamentals` ("dividend_yield", "market_cap")', provider: 'TradingView Screener API', fallback: 'Local TV Screener API scraper ➔ yfinance `dividendYield` / `marketCap`' },
+                    { field: 'sector', primary: 'MCP `market.get_fundamentals` ("sector")', provider: 'TradingView Screener API', fallback: 'Local TV Screener API scraper ➔ yfinance `sector`' },
+                    { field: 'ev_ebitda', primary: 'yfinance.info ("enterpriseToEbitda")', provider: 'Yahoo Finance API (Direct)', fallback: 'None' },
+                    { field: 'revenue_growth, earnings_growth', primary: 'yfinance.info ("revenueGrowth", "earningsGrowth")', provider: 'Yahoo Finance API (Direct)', fallback: 'None' },
+                    { field: 'promoter_holding, institutional_holding', primary: 'MCP `market.get_ownership`', provider: 'NSE & TradingView (MCP)', fallback: 'yfinance.major_holders (`major_holders` parsing)' },
+                    { field: 'interest_coverage', primary: 'MCP `market.get_financials` ("interest_coverage")', provider: 'TradingView / yfinance (MCP)', fallback: 'yfinance.financials (EBIT / Interest Expense) ➔ Python estimated as: `operating_margin / debt_to_equity` (capped at 99.0)' },
+                    { field: 'free_cash_flow', primary: 'MCP `market.get_financials` ("free_cash_flow")', provider: 'TradingView / yfinance (MCP)', fallback: 'yfinance.cashflow (Operating Cash Flow + Capital Expenditures)' },
+                    { field: 'fundamental_score', primary: 'Weighted Python scorecard (out of 40 points) over 10 metrics', provider: 'ArthaVest Engine (Python)', fallback: 'Defaults to neutral score 20.0 (HOLD) on complete data failure' }
+                ]
+            },
+            sentiment: {
+                title: 'Sentiment Agent',
+                oneLiner: 'Scrapes recent news headlines from 9 RSS feeds via MCP, scores them using FinVADER, and asks Gemini to interpret the narrative.',
+                flowSteps: [
+                    {
+                        icon: '📰', label: 'Step 1 — Fetch News Headlines (Horizon-Tuned Window)',
+                        detail: `Calls <code>mcp_safe("news.get_stock_news", {symbol, days})</code> where <b>days is tuned by horizon</b> (SHORT=7, MID=14, LONG=30).<br>
+                        <b>MCP Backend:</b> 9 RSS feeds (Google News site queries for NSE/BSE/SEBI, RBI, ET Markets, LiveMint, Moneycontrol, Business Standard, Google News).<br>
+                        <b>Expected Data Schema:</b> <code>[{title, source, published_at, url, weight_final, anomaly_candidate, auto_trigger_debate}]</code>.<br>
+                        It includes dedup, time decay, and anomaly flagging.`
+                    },
+                    {
+                        icon: '📊', label: 'Step 2 — FinVADER Scoring',
+                        detail: `Passes each headline through FinVADER (a financial-tuned VADER model).<br>
+                        Outputs a compound score from -1.0 (extremely negative) to +1.0 (extremely positive) for each headline.<br>
+                        Calculates the <b>average sentiment score</b> across all headlines.`
+                    },
+                    {
+                        icon: '📝', label: 'Step 3 — Prompt Construction',
+                        detail: `Injects the raw headlines and their individual FinVADER scores into the prompt.`
+                    },
+                    {
+                        icon: '🤖', label: 'Step 4 — LLM Call',
+                        detail: `Gemini reads the headlines and the average FinVADER score.<br>
+                        It generates a narrative summarizing the key themes (e.g., earnings beat, regulatory issues) and returns a final sentiment signal.`
+                    },
+                ],
+                concepts: [
+                    { q: 'What is FinVADER?', a: 'Standard VADER NLP flags words like "share" or "loss" incorrectly. FinVADER is specifically tuned for financial lexicons (e.g., "loss of market share" vs "loss").' },
+                    { q: 'What happens if auto_trigger_debate=true?', a: 'If news comes from high-priority regulatory feeds (NSE/BSE/SEBI) and is flagged, it can automatically trigger the Debate and Decision agents to review open positions immediately.' },
+                ],
+                dataSources: [
+                    { source: 'MCP: news.get_stock_news', provides: 'Aggregated news from 9 Financial RSS feeds', fallback: 'Local feedparser (Google News RSS)' },
+                ],
+                knownIssues: [
+                    'Google News RSS fallback can sometimes pull unrelated articles if the company name is generic.',
+                    'Requires FinVADER / NLTK packages installed locally to run without MCP.',
+                ],
+                fieldMapping: [
+                    { field: 'news_headlines (title, url, source, date)', primary: 'MCP `news.get_stock_news` (weighted dedup with time decay)', provider: '9 RSS sources (NSE, BSE, SEBI, ET Markets, LiveMint, Moneycontrol, Business Standard, RBI, Google News)', fallback: 'Local `feedparser` scraping Google News RSS feed for the stock' },
+                    { field: 'anomaly_candidate', primary: 'Auto-detected inside MCP server news ingestion layer', provider: 'ArthaVest MCP Server', fallback: 'Hardcoded `False`' },
+                    { field: 'auto_trigger_debate', primary: 'Set to True inside MCP for high-priority NSE/BSE/SEBI regulatory updates', provider: 'ArthaVest MCP Server', fallback: 'Hardcoded `False`' },
+                    { field: 'reddit_posts (mentions)', primary: 'Reddit Search API (PRAW client queries r/IndianStreetBets)', provider: 'Reddit API', fallback: 'Gracefully skipped if PRAW credentials or reddit tokens are missing' },
+                    { field: 'finvader_score', primary: 'Python FinVADER compound sentiment score per headline (scaled -1.0 to +1.0)', provider: 'Local NLP FinVADER library (Python)', fallback: 'N/A' },
+                    { field: 'final_narrative & signal', primary: 'Gemini 3.1 Flash-Lite AI analysis of news headlines and FinVADER scores', provider: 'Google Gemini API', fallback: 'FinVADER Offline Fallback (Average score > 0.2 ➔ BUY, < -0.2 ➔ SELL, else HOLD; capped at HOLD if anomalies exist; confidence 40%)' }
+                ]
+            }
+        };
+
+        function renderAgentFlow(agentKey) {
+            const info = AGENT_ARCH[agentKey];
+            if (!info) return;
+
+            // ─── Left Panel (compact) ───
+            let html = `<p class="text-gray-300 font-medium text-sm mb-3">${info.oneLiner}</p>`;
+            html += '<div class="space-y-1.5">';
+            info.flowSteps.forEach((s, i) => {
+                html += `<div class="flex items-start gap-2"><span>${s.icon}</span><span class="text-gray-200 font-semibold">${s.label}</span></div>`;
+            });
+            html += '</div>';
+            if (info.dataSources && info.dataSources.length > 0) {
+                html += '<div class="mt-3 pt-3 border-t border-gray-800"><p class="text-cyan-400 font-semibold text-xs mb-1">📌 Data Sources</p><ul class="list-none space-y-1">';
+                info.dataSources.forEach(ds => {
+                    html += `<li>• <code class="bg-gray-800 text-cyan-300 px-1 rounded text-[10px]">${ds.source}</code><br><span class="text-gray-500 ml-3">→ ${ds.provides}</span>`;
+                    if (ds.fallback) html += `<br><span class="text-yellow-500/70 ml-3">↳ Fallback: ${ds.fallback}</span>`;
+                    html += '</li>';
+                });
+                html += '</ul></div>';
+            }
+            if (info.knownIssues.length > 0) {
+                html += '<div class="mt-3 pt-3 border-t border-gray-800"><p class="text-yellow-500 font-semibold text-xs mb-1">⚠ Known Issues</p><ul class="list-disc pl-4 space-y-1">';
+                info.knownIssues.forEach(issue => { html += `<li class="text-yellow-400/80">${issue}</li>`; });
+                html += '</ul></div>';
+            }
+            document.getElementById('agentFlowInfo').innerHTML = html;
+
+            // ─── Architecture Tab (detailed) ───
+            let a = '';
+
+            // Pipeline
+            a += '<div class="bg-gray-900 border border-gray-800 rounded-lg p-5"><h3 class="text-sm font-bold text-white mb-4">Execution Pipeline</h3><div class="space-y-4">';
+            info.flowSteps.forEach((s, i) => {
+                a += `<div class="flex items-start gap-3">
+                    <div class="flex flex-col items-center flex-shrink-0">
+                        <div class="w-8 h-8 rounded-full bg-blue-900/50 border border-blue-500/50 flex items-center justify-center text-sm">${s.icon}</div>
+                        ${i < info.flowSteps.length - 1 ? '<div class="w-0.5 h-8 bg-gray-700 mt-1"></div>' : ''}
+                    </div>
+                    <div class="pt-1 flex-1">
+                        <p class="text-sm font-semibold text-white">${s.label}</p>
+                        <p class="step-detail text-xs text-gray-400 mt-1 leading-relaxed">${s.detail}</p>
+                    </div>
+                </div>`;
+            });
+            a += '</div></div>';
+
+            // Detailed Field-to-Source Mapping ("From Where We Get What")
+            if (info.fieldMapping && info.fieldMapping.length > 0) {
+                a += '<div class="bg-gray-900 border border-gray-800 rounded-lg p-5"><h3 class="text-sm font-bold text-white mb-4">Detailed Field-to-Source Mapping ("From Where We Get What")</h3>';
+                a += '<div class="overflow-x-auto"><table class="w-full text-xs text-left min-w-[600px] border-collapse"><thead><tr class="border-b border-gray-700 bg-gray-950/40"><th class="py-2.5 px-3 text-gray-500 uppercase font-bold tracking-wider w-1/4">Field / Metric</th><th class="py-2.5 px-3 text-gray-500 uppercase font-bold tracking-wider w-1/4">Primary Query Source</th><th class="py-2.5 px-3 text-gray-500 uppercase font-bold tracking-wider w-1/6">Backend Provider</th><th class="py-2.5 px-3 text-gray-500 uppercase font-bold tracking-wider w-1/3">Fallback Chain (On Primary Fail)</th></tr></thead><tbody>';
+                info.fieldMapping.forEach(fm => {
+                    a += `<tr class="border-b border-gray-800/80 hover:bg-gray-800/20 transition-colors"><td class="py-2.5 px-3 font-mono text-cyan-300 font-semibold whitespace-nowrap">${fm.field}</td><td class="py-2.5 px-3 text-gray-300">${fm.primary}</td><td class="py-2.5 px-3 text-indigo-300">${fm.provider}</td><td class="py-2.5 px-3 text-yellow-400 font-medium text-[11px] leading-snug">${fm.fallback}</td></tr>`;
+                });
+                a += '</tbody></table></div></div>';
+            }
+
+            // Data Sources Table (original high-level summary)
+            if (info.dataSources && info.dataSources.length > 0) {
+                a += '<div class="bg-gray-900 border border-gray-800 rounded-lg p-5"><h3 class="text-sm font-bold text-white mb-4">High-Level Data Sources & Fallback Chain</h3>';
+                a += '<table class="w-full text-xs"><thead><tr class="border-b border-gray-700"><th class="text-left py-2 text-gray-500 uppercase">Source</th><th class="text-left py-2 text-gray-500 uppercase">Provides</th><th class="text-left py-2 text-gray-500 uppercase">Fallback</th></tr></thead><tbody>';
+                info.dataSources.forEach(ds => {
+                    a += `<tr class="border-b border-gray-800"><td class="py-2 text-cyan-300 font-mono">${ds.source}</td><td class="py-2 text-gray-300">${ds.provides}</td><td class="py-2 text-yellow-400">${ds.fallback || '—'}</td></tr>`;
+                });
+                a += '</tbody></table></div>';
+            }
+
+            // Concepts Q&A
+            a += '<div class="bg-gray-900 border border-gray-800 rounded-lg p-5"><h3 class="text-sm font-bold text-white mb-4">Core Concepts (Q&A)</h3><div class="space-y-4">';
+            info.concepts.forEach(c => {
+                a += `<div><p class="text-sm font-semibold text-blue-400">${c.q}</p><p class="step-detail text-xs text-gray-400 mt-1 leading-relaxed">${c.a}</p></div>`;
+            });
+            a += '</div></div>';
+
+            // Known Issues
+            if (info.knownIssues.length > 0) {
+                a += '<div class="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-5"><h3 class="text-sm font-bold text-yellow-400 mb-3">⚠ Known Issues & Debate Points</h3><ul class="space-y-2 list-disc pl-4">';
+                info.knownIssues.forEach(issue => { a += `<li class="text-xs text-yellow-300/80 leading-relaxed">${issue}</li>`; });
+                a += '</ul></div>';
+            }
+            document.getElementById('archContent').innerHTML = a;
+        }
+
+        document.getElementById('agent').addEventListener('change', e => renderAgentFlow(e.target.value));
+        renderAgentFlow(document.getElementById('agent').value);
+
+        // ── Health Modal ──
+        document.getElementById('healthBtn').addEventListener('click', async () => {
+            document.getElementById('healthModal').classList.remove('hidden');
+            document.getElementById('healthData').textContent = "Loading...";
+            try { document.getElementById('healthData').textContent = JSON.stringify(await (await fetch(`${baseUrl}/connections/health`)).json(), null, 2); }
+            catch(e) { document.getElementById('healthData').textContent = "Failed: " + e.message; }
+        });
+        document.getElementById('closeModalBtn').addEventListener('click', () => document.getElementById('healthModal').classList.add('hidden'));
+
+        // ── Tabs ──
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', e => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                e.target.classList.add('active');
+                document.getElementById(e.target.dataset.tab).classList.add('active');
+            });
+        });
+
+        // ── Helpers ──
+        function scoreColor(v) { return v >= 70 ? 'bg-green-500' : v >= 40 ? 'bg-yellow-500' : 'bg-red-500'; }
+        function signalStyle(sig) {
+            if (sig === 'BUY')  return { color: 'text-green-400', border: 'border-green-500/50', bg: 'bg-green-900/20' };
+            if (sig === 'SELL') return { color: 'text-red-400',   border: 'border-red-500/50',   bg: 'bg-red-900/20' };
+            return { color: 'text-gray-400', border: 'border-gray-600', bg: 'bg-gray-800' };
+        }
+        function labelFormat(k) { return k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
+
+        // ── Custom Model & Key Inputs Toggles ──
+        document.getElementById('customModel').addEventListener('change', e => {
+            const input = document.getElementById('customModelInput');
+            if (e.target.value === 'CUSTOM') {
+                input.classList.remove('hidden');
+                input.focus();
+            } else {
+                input.classList.add('hidden');
+            }
+        });
+
+        document.getElementById('apiKeyOption').addEventListener('change', e => {
+            const input = document.getElementById('customApiKeyInput');
+            if (e.target.value === 'PASTE') {
+                input.classList.remove('hidden');
+                input.focus();
+            } else {
+                input.classList.add('hidden');
+            }
+        });
+
+        // ── Stock Symbol Autocomplete Dropdown ──
+        const symbolInput = document.getElementById('symbol');
+        const sugBox = document.getElementById('suggestions');
+        let debounceTimer;
+
+        symbolInput.addEventListener('input', e => {
+            clearTimeout(debounceTimer);
+            const val = e.target.value.trim();
+            if (!val) {
+                sugBox.classList.add('hidden');
+                return;
+            }
+
+            debounceTimer = setTimeout(async () => {
+                try {
+                    const r = await fetch(`${baseUrl}/analysis/autocomplete?q=${encodeURIComponent(val)}`);
+                    if (!r.ok) return;
+                    const items = await r.json();
+                    if (!items || !items.length) {
+                        sugBox.classList.add('hidden');
+                        return;
+                    }
+
+                    sugBox.innerHTML = items.map(item => `
+                        <div class="px-3 py-2 hover:bg-gray-800 cursor-pointer border-b border-gray-800 last:border-b-0 text-xs flex justify-between items-center transition-colors" data-sym="${item.symbol}">
+                            <div>
+                                <span class="font-bold text-cyan-400 font-mono">${item.symbol}</span>
+                                <span class="text-gray-400 ml-1.5">${item.name}</span>
+                            </div>
+                            <span class="bg-gray-800 text-[10px] text-gray-400 px-1.5 py-0.5 rounded font-mono uppercase">${item.exch}</span>
+                        </div>
+                    `).join('');
+
+                    sugBox.classList.remove('hidden');
+
+                    // Click handler
+                    sugBox.querySelectorAll('[data-sym]').forEach(el => {
+                        el.addEventListener('click', () => {
+                            symbolInput.value = el.dataset.sym;
+                            sugBox.classList.add('hidden');
+                        });
+                    });
+
+                } catch (err) {
+                    console.error("Autocomplete fetch failed:", err);
+                }
+            }, 300);
+        });
+
+        // Close autocomplete dropdown on click outside
+        document.addEventListener('click', e => {
+            if (!symbolInput.contains(e.target) && !sugBox.contains(e.target)) {
+                sugBox.classList.add('hidden');
+            }
+        });
+
+        // ── Execute ──
+        document.getElementById('runBtn').addEventListener('click', async () => {
+            const symbol = document.getElementById('symbol').value.trim();
+            const agent = document.getElementById('agent').value;
+            const horizon = document.getElementById('horizon').value;
+            if (!symbol) return alert("Please enter a stock symbol.");
+
+            document.getElementById('spinner').classList.remove('hidden');
+            document.getElementById('btnText').textContent = "Executing...";
+            document.getElementById('runBtn').disabled = true;
+            document.getElementById('errorContainer').classList.add('hidden');
+
+            const customModelSelect = document.getElementById('customModel').value;
+            const customModel = customModelSelect === 'CUSTOM' ? document.getElementById('customModelInput').value.trim() : customModelSelect;
+            
+            const apiKeyOption = document.getElementById('apiKeyOption').value;
+            const customApiKey = apiKeyOption === 'PASTE' ? document.getElementById('customApiKeyInput').value.trim() : apiKeyOption;
+
+            const requestBody = { symbol, agent, horizon };
+            if (customModel) requestBody.custom_model = customModel;
+            if (customApiKey) requestBody.custom_api_key = customApiKey;
+
+            try {
+                const resp = await fetch(`${baseUrl}/analysis/test-agent`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(requestBody)
+                });
+                const data = await resp.json();
+                if (!resp.ok) {
+                    document.getElementById('errorContainer').classList.remove('hidden');
+                    document.getElementById('errorMsg').textContent = data.detail || JSON.stringify(data);
+                    // Don't leave the Input Data / Prompt / JSON tabs showing the PREVIOUS
+                    // run's content — that makes a failed run look identical to the last one.
+                    document.getElementById('content-data').textContent =
+                        `(no Input Data — ${agent} @ ${horizon} failed: ${(data.detail || 'request error').toString().slice(0,300)})`;
+                    document.getElementById('content-json').textContent = '';
+                    document.getElementById('content-prompt').textContent = '';
+                    document.getElementById('content-raw-llm').textContent = '';
+                    return;
+                }
+
+                document.getElementById('emptyState').classList.add('hidden');
+                const rv = document.getElementById('resultsView'); rv.classList.remove('hidden'); rv.classList.add('flex');
+
+                document.getElementById('resAgent').textContent = agent;
+                document.getElementById('resSymbol').textContent = symbol;
+                document.getElementById('resHorizon').textContent = horizon;
+                document.getElementById('resModel').textContent = data.model_used || "—";
+                
+                // Set output date and time right next to the model name
+                const now = new Date();
+                const formattedTS = now.toLocaleDateString('en-GB') + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                document.getElementById('resTimestamp').textContent = `@ ${formattedTS}`;
+                
+                document.getElementById('resTime').textContent = `${data.elapsed_sec}s`;
+
+                const out = data.output || {};
+                const trace = out._debug_trace || {};
+                const clean = { ...out }; delete clean.raw_data; delete clean._debug_trace;
+
+                const sig = (out.signal || "HOLD").toUpperCase();
+                const ss = signalStyle(sig);
+                const sc = document.getElementById('signalCard'); sc.className = `flex-1 ${ss.bg} border ${ss.border} rounded-lg p-5 text-center`;
+                const st = document.getElementById('signalText'); st.textContent = sig; st.className = `text-4xl font-black tracking-wide ${ss.color}`;
+
+                const confPct = Math.round((out.confidence || 0) * 100);
+                document.getElementById('confText').textContent = confPct + '%';
+                document.getElementById('confBar').style.width = confPct + '%';
+                document.getElementById('confBar').className = `score-fill ${scoreColor(confPct)}`;
+
+                const trend = (out.key_levels && out.key_levels.trend_direction) || "—";
+                const tt = document.getElementById('trendText'); tt.textContent = trend;
+                tt.className = trend === 'BULLISH' ? 'text-2xl font-bold text-green-400' : trend === 'BEARISH' ? 'text-2xl font-bold text-red-400' : 'text-2xl font-bold text-yellow-400';
+
+                document.getElementById('narrative-html').innerHTML = out.narrative || '<span class="text-gray-500">No narrative.</span>';
+
+                const klBody = document.getElementById('keyLevelsBody'); klBody.innerHTML = '';
+                for (const [k, v] of Object.entries(out.key_levels || {})) {
+                    if (k === 'trend_direction') continue;
+                    const tr = document.createElement('tr'); tr.className = 'border-b border-gray-800';
+                    tr.innerHTML = `<td class="py-2 text-gray-400 text-xs uppercase">${labelFormat(k)}</td><td class="py-2 text-right font-mono text-white font-semibold">₹${Number(v).toLocaleString('en-IN')}</td>`;
+                    klBody.appendChild(tr);
+                }
+
+                const ssCont = document.getElementById('subScoresContainer'); ssCont.innerHTML = '';
+                for (const [k, v] of Object.entries(out.sub_scores || {})) {
+                    const val = Number(v);
+                    ssCont.innerHTML += `<div><div class="flex justify-between text-xs mb-1"><span class="text-gray-400">${labelFormat(k)}</span><span class="font-mono text-white font-semibold">${val}/100</span></div><div class="score-bar"><div class="score-fill ${scoreColor(val)}" style="width:${val}%"></div></div></div>`;
+                }
+
+                const patterns = out.patterns_detected || [];
+                const pSec = document.getElementById('patternsSection'); const pCont = document.getElementById('patternsContainer');
+                if (patterns.length) { pSec.classList.remove('hidden'); pCont.innerHTML = patterns.map(p => `<span class="bg-purple-900/40 border border-purple-500/50 text-purple-300 text-sm px-3 py-1 rounded-full">${p}</span>`).join(''); }
+                else { pSec.classList.add('hidden'); }
+
+                document.getElementById('content-json').textContent = JSON.stringify(clean, null, 2);
+                document.getElementById('content-data').textContent = JSON.stringify(out.raw_data || {}, null, 2);
+                document.getElementById('content-prompt').textContent = trace.prompt_sent_to_llm || "Debug trace unavailable.";
+                document.getElementById('content-raw-llm').textContent = trace.raw_llm_response || "Debug trace unavailable.";
+
+            } catch (err) { document.getElementById('errorContainer').classList.remove('hidden'); document.getElementById('errorMsg').textContent = err.message; }
+            finally { document.getElementById('spinner').classList.add('hidden'); document.getElementById('btnText').textContent = "Execute Agent"; document.getElementById('runBtn').disabled = false; }
+        });
+    </script>
+</body>
+</html>

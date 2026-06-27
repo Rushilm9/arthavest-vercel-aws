@@ -1,0 +1,51 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,100..900;1,100..900&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-cream text-primary antialiased font-sans;
+  }
+}
+
+@keyframes shrinkWidth {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+/* Rich formatting for parsed HTML LLM outputs */
+.safe-html-content ul {
+  list-style-type: disc !important;
+  padding-left: 1.25rem !important;
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.safe-html-content ol {
+  list-style-type: decimal !important;
+  padding-left: 1.25rem !important;
+  margin-top: 0.5rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.safe-html-content li {
+  margin-bottom: 0.25rem !important;
+  line-height: 1.6 !important;
+}
+
+.safe-html-content p {
+  margin-bottom: 0.5rem !important;
+  line-height: 1.6 !important;
+}
+
+.safe-html-content p:last-child {
+  margin-bottom: 0 !important;
+}
+
+

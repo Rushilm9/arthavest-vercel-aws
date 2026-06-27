@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quant AI — LLM-as-Judge Evals</title>
+<script src="/config.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#EDE9E3; --panel:#FFFFFF; --panel-2:#F5F1EC; --border:#D8D2CA;
+    --border-2:#C8C0B6; --text:#1C1814; --muted:#8C8278; --accent:#E07A2A;
+    --accent-2:#B85A10; --accent-bg:#FEF3E8;
+    --pass:#16a34a; --pass-bg:#e9f7ef; --fail:#dc2626; --fail-bg:#fdecec;
+    --na:#6b7280; --na-bg:#f1f0ee;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; line-height:1.5; }
+  header {
+    background:var(--panel); border-bottom:1px solid var(--border);
+    padding:12px 24px; position:sticky; top:0; z-index:10;
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  header .brand { display:flex; align-items:center; gap:12px; }
+  header .logo {
+    width:32px; height:32px; border-radius:8px; background:var(--accent); color:#fff;
+    display:grid; place-items:center; font-weight:900; font-size:16px; font-family:monospace;
+  }
+  header h1 { font-size:15px; font-weight:700; }
+  header .sub { font-size:12px; color:var(--muted); }
+  header .links { display:flex; gap:8px; }
+  header a.home {
+    font-size:12px; color:var(--accent); text-decoration:none;
+    padding:5px 12px; border:1px solid var(--accent); border-radius:6px;
+  }
+  header a.home:hover { background:var(--accent-bg); }
+
+  main { padding:16px 24px 40px; max-width:1800px; margin:0 auto; }
+
+  .toolbar {
+    background:var(--panel); border:1px solid var(--border); border-radius:10px;
+    padding:12px 14px; margin-bottom:14px; display:flex; gap:12px;
+    align-items:center; flex-wrap:wrap;
+  }
+  button {
+    background:var(--accent); color:#fff; border:0; padding:6px 14px; border-radius:7px;
+    font-weight:600; font-size:13px; cursor:pointer; font-family:inherit;
+  }
+  button:hover { background:var(--accent-2); }
+  .meta { font-size:12px; color:var(--muted); display:flex; gap:14px; flex-wrap:wrap; }
+  .meta b { color:var(--text); }
+  a.deep { font-size:12px; color:var(--accent); text-decoration:none; }
+  a.deep:hover { text-decoration:underline; }
+
+  .explainer {
+    background:var(--accent-bg); border:1px solid var(--border); border-left:3px solid var(--accent);
+    border-radius:8px; padding:10px 14px; margin-bottom:14px; font-size:12.5px; color:var(--text);
+  }
+  .explainer b { color:var(--accent-2); }
+
+  .panel { background:var(--panel); border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  table { width:100%; border-collapse:collapse; }
+  thead th {
+    background:var(--panel-2); text-align:left; font-size:11px; font-weight:700;
+    text-transform:uppercase; letter-spacing:.04em; color:var(--muted);
+    padding:10px 12px; border-bottom:1px solid var(--border); white-space:nowrap;
+  }
+  tbody td { padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:top; font-size:13px; }
+  tbody tr:last-child td { border-bottom:0; }
+  .ticker { font-family:'JetBrains Mono',monospace; font-weight:600; }
+  .action-chip, .verdict {
+    display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px; font-weight:700;
+    font-family:'JetBrains Mono',monospace;
+  }
+  .action-chip { background:var(--na-bg); color:var(--text); border:1px solid var(--border-2); }
+
+  .eval-cell { min-width:220px; max-width:340px; }
+  .verdict.pass { background:var(--pass-bg); color:var(--pass); }
+  .verdict.fail { background:var(--fail-bg); color:var(--fail); }
+  .verdict.na   { background:var(--na-bg);   color:var(--na); }
+  .score { font-size:11px; color:var(--muted); margin-left:6px; font-family:'JetBrains Mono',monospace; }
+  .why { font-size:11.5px; color:var(--muted); margin-top:5px; line-height:1.45; }
+  .judge-tag {
+    display:inline-block; font-size:9px; font-weight:700; letter-spacing:.05em;
+    padding:1px 5px; border-radius:4px; margin-left:6px; vertical-align:middle;
+  }
+  .judge-llm  { background:#ede9fe; color:#6d28d9; }
+  .judge-code { background:#e0f2fe; color:#0369a1; }
+
+  .status { font-size:13px; color:var(--muted); padding:24px; text-align:center; }
+  .status.err { color:var(--fail); }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo">Q</div>
+    <div>
+      <h1>LLM-as-Judge Evals <span class="sub">· Arize Phoenix (via MCP)</span></h1>
+      <div class="sub">Per-stock evaluator scores read live from Phoenix Cloud over the MCP connection</div>
+    </div>
+  </div>
+  <div class="links">
+    <a class="home" href="/agentlogs">Agent Logs</a>
+    <a class="home" href="/">← Home</a>
+  </div>
+</header>
+
+<main>
+  <div class="explainer">
+    <b>Why this page matters:</b> The <b>wait_discipline</b> column is a deterministic exact-match check
+    (action == expected). The <span class="judge-tag judge-llm">LLM JUDGE</span> columns are Gemini-powered
+    evaluators (Arize Phoenix Evals) that read the agent's <i>rationale</i> against the <i>evidence it saw</i> —
+    catching ungrounded reasoning, unreasonable decisions, and lazy WAITs that exact-match cannot.
+  </div>
+
+  <div class="toolbar">
+    <button id="refresh" onclick="load()">↻ Refresh from Phoenix (MCP)</button>
+    <div class="meta">
+      <span>Dataset: <b id="m-dataset">—</b></span>
+      <span>Experiment: <b id="m-exp">—</b></span>
+      <span id="m-link"></span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div id="status" class="status">Loading evaluator results from Phoenix over MCP…</div>
+    <table id="tbl" style="display:none">
+      <thead><tr id="thead-row"></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+  // Resolved from /config.js (window.__API_BASE__, set by PUBLIC_API_BASE_URL).
+  const API_BASE = (window.__API_BASE__ && window.__API_BASE__.trim())
+    ? window.__API_BASE__.replace(/\/$/, "")
+    : (window.location.origin.startsWith("file:") ? "http://localhost:8000" : "");
+
+  // Which evaluator names are LLM-as-judge (vs deterministic CODE).
+  const LLM_JUDGES = new Set(["rationale_groundedness", "decision_correctness", "wait_refusal_quality"]);
+  const PRETTY = {
+    wait_discipline:        "wait_discipline",
+    rationale_groundedness: "rationale groundedness",
+    decision_correctness:   "decision correctness",
+    wait_refusal_quality:   "wait-refusal quality",
+  };
+
+  function esc(s) {
+    return String(s ?? "").replace(/[&<>"']/g, c =>
+      ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  }
+
+  function verdictClass(score, label) {
+    const l = String(label || "").toLowerCase();
+    if (l.includes("n/a") || l.includes("not_") || l.includes("no_rationale") || l === "na") return "na";
+    if (score === 1 || score === 1.0) return "pass";
+    if (score === 0 || score === 0.0) return "fail";
+    return "na";
+  }
+
+  function evalCell(ev) {
+    if (!ev) return `<span class="verdict na">—</span>`;
+    const cls = verdictClass(ev.score, ev.label);
+    const scoreTxt = (ev.score === 0 || ev.score) ? `<span class="score">${ev.score}</span>` : "";
+    const why = ev.explanation ? `<div class="why">${esc(ev.explanation)}</div>` : "";
+    return `<span class="verdict ${cls}">${esc(ev.label || "?")}</span>${scoreTxt}${why}`;
+  }
+
+  async function load() {
+    const status = document.getElementById("status");
+    const tbl = document.getElementById("tbl");
+    status.style.display = "block"; status.className = "status";
+    status.textContent = "Loading evaluator results from Phoenix over MCP…";
+    tbl.style.display = "none";
+
+    let data;
+    try {
+      const r = await fetch(`${API_BASE}/api/evals/experiment`);
+      data = await r.json();
+    } catch (e) {
+      status.className = "status err";
+      status.textContent = "Failed to reach the backend: " + e.message;
+      return;
+    }
+
+    document.getElementById("m-dataset").textContent = data.dataset_name || "—";
+    document.getElementById("m-exp").textContent = data.experiment_id || "—";
+
+    if (data.error && (!data.rows || data.rows.length === 0)) {
+      status.className = "status err";
+      status.textContent = data.error;
+      return;
+    }
+    if (!data.rows || data.rows.length === 0) {
+      status.textContent = "No experiment results yet. Run eval/run_experiment.py to generate them.";
+      return;
+    }
+
+    // Deep link into Phoenix Cloud.
+    if (data.phoenix_base_url) {
+      document.getElementById("m-link").innerHTML =
+        `<a class="deep" target="_blank" href="${esc(data.phoenix_base_url)}/datasets">Open in Phoenix Cloud ↗</a>`;
+    }
+
+    // Build header: fixed cols + one column per evaluator (deterministic first, LLM after).
+    const evaluators = (data.evaluators || []).slice().sort((a, b) => {
+      const al = LLM_JUDGES.has(a) ? 1 : 0, bl = LLM_JUDGES.has(b) ? 1 : 0;
+      return al - bl;
+    });
+    const thead = document.getElementById("thead-row");
+    thead.innerHTML =
+      `<th>Stock</th><th>Action</th><th>Expected</th>` +
+      evaluators.map(name => {
+        const tag = LLM_JUDGES.has(name)
+          ? `<span class="judge-tag judge-llm">LLM JUDGE</span>`
+          : `<span class="judge-tag judge-code">EXACT</span>`;
+        return `<th>${esc(PRETTY[name] || name)}${tag}</th>`;
+      }).join("");
+
+    // Build rows.
+    const tbody = document.getElementById("tbody");
+    tbody.innerHTML = data.rows.map(row => {
+      const cells = evaluators.map(name =>
+        `<td class="eval-cell">${evalCell(row.evals ? row.evals[name] : null)}</td>`).join("");
+      return `<tr>
+        <td class="ticker">${esc(row.ticker)}</td>
+        <td><span class="action-chip">${esc(row.action)}</span></td>
+        <td><span class="action-chip">${esc(row.expected_action)}</span></td>
+        ${cells}
+      </tr>`;
+    }).join("");
+
+    status.style.display = "none";
+    tbl.style.display = "table";
+  }
+
+  load();
+</script>
+</body>
+</html>

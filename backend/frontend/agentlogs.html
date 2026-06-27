@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quant AI — Agent Logs Detail</title>
+<script src="/config.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #EDE9E3;
+    --panel:     #FFFFFF;
+    --panel-2:   #F5F1EC;
+    --border:    #D8D2CA;
+    --border-2:  #C8C0B6;
+    --text:      #1C1814;
+    --muted:     #8C8278;
+    --accent:    #E07A2A;
+    --accent-2:  #B85A10;
+    --accent-bg: #FEF3E8;
+    --buy:       #16a34a;
+    --sell:      #dc2626;
+    --hold:      #f59e0b;
+    --wait:      #6b7280;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh; line-height: 1.5;
+  }
+  header {
+    background: var(--panel); border-bottom: 1px solid var(--border);
+    padding: 12px 24px; position: sticky; top: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  header .brand { display: flex; align-items: center; gap: 12px; }
+  header .logo {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--accent); color: #fff;
+    display: grid; place-items: center; font-weight: 900; font-size: 16px; font-family: monospace;
+  }
+  header h1 { font-size: 15px; font-weight: 700; }
+  header .sub { font-size: 12px; color: var(--muted); }
+  header a.home {
+    font-size: 12px; color: var(--accent); text-decoration: none;
+    padding: 5px 12px; border: 1px solid var(--accent); border-radius: 6px;
+  }
+  header a.home:hover { background: var(--accent-bg); }
+
+  main { padding: 16px 24px 40px; max-width: 1800px; margin: 0 auto; }
+
+  .filter-bar {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 14px;
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  }
+  .filter-bar label { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+  .filter-bar select, .filter-bar input {
+    padding: 5px 10px; border: 1px solid var(--border); border-radius: 6px;
+    font-family: inherit; font-size: 13px; background: var(--panel);
+  }
+  button {
+    background: var(--accent); color: #fff; border: 0;
+    padding: 6px 14px; border-radius: 7px; font-weight: 600;
+    font-size: 13px; cursor: pointer; font-family: inherit;
+  }
+  button:hover { background: var(--accent-2); }
+  button.secondary {
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border);
+  }
+  button.secondary:hover { background: var(--border); }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 14px;
+    min-height: 70vh;
+  }
+  @media (max-width: 1100px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px;
+  }
+  .card h3 { font-size: 13px; font-weight: 700; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+
+  /* Run list */
+  .run-list { max-height: 78vh; overflow-y: auto; padding-right: 4px; }
+  .run-row {
+    display: block; padding: 10px 12px; border: 1px solid var(--border);
+    border-radius: 8px; margin-bottom: 8px; cursor: pointer; background: var(--panel);
+    transition: border-color 0.1s, background 0.1s;
+  }
+  .run-row:hover { border-color: var(--accent); background: var(--accent-bg); }
+  .run-row.active { border-color: var(--accent); background: var(--accent-bg); }
+  .run-row .top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+  .run-row .wf { font-size: 12px; font-weight: 600; color: var(--text); }
+  .run-row .meta { font-size: 11px; color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; }
+  .run-row .meta b { color: var(--text); }
+
+  /* Agent timeline */
+  .agent-card {
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px; margin-bottom: 8px; background: var(--panel);
+  }
+  .agent-card .top {
+    display: flex; align-items: center; justify-content: space-between;
+    cursor: pointer; gap: 10px;
+  }
+  .agent-card .name { font-size: 13px; font-weight: 600; }
+  .agent-card .name .type { font-size: 10px; color: var(--muted); font-weight: 500; margin-left: 6px; }
+  .agent-card .stats { font-size: 11px; color: var(--muted); display: flex; gap: 10px; flex-wrap: wrap; }
+  .agent-card .stats b { color: var(--text); font-weight: 600; }
+  .agent-card .body { display: none; margin-top: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+  .agent-card.open .body { display: block; }
+  .agent-card .body h4 { font-size: 11px; text-transform: uppercase; color: var(--muted); margin: 8px 0 4px; letter-spacing: 0.05em; }
+
+  pre {
+    font-family: 'JetBrains Mono', monospace;
+    background: #0f172a; color: #e2e8f0;
+    padding: 10px; border-radius: 6px;
+    font-size: 11px; white-space: pre-wrap; word-break: break-all;
+    max-height: 320px; overflow: auto; line-height: 1.5;
+  }
+  .err-box {
+    background: #fee2e2; color: #991b1b; padding: 10px; border-radius: 6px;
+    font-size: 12px; font-family: 'JetBrains Mono', monospace;
+    white-space: pre-wrap; word-break: break-word;
+  }
+
+  .pill {
+    display: inline-block; padding: 2px 8px; border-radius: 999px;
+    font-size: 10px; font-weight: 700; text-transform: uppercase;
+  }
+  .pill.SUCCESS, .pill.COMPLETED, .pill.BUY      { background: #dcfce7; color: #166534; }
+  .pill.FAILED,  .pill.SELL                       { background: #fee2e2; color: #991b1b; }
+  .pill.STARTED, .pill.RUNNING, .pill.HOLD        { background: #fef3c7; color: #92400e; }
+  .pill.WAIT                                      { background: #e5e7eb; color: #374151; }
+
+  .empty { color: var(--muted); font-size: 13px; padding: 24px; text-align: center; }
+  .loading { color: var(--accent); font-size: 13px; padding: 14px; text-align: center; }
+
+  .stats-strip {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px; margin-bottom: 12px;
+  }
+  .stat-cell {
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 12px;
+  }
+  .stat-cell .label { font-size: 10px; color: var(--muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; }
+  .stat-cell .value { font-size: 16px; font-weight: 700; color: var(--text); margin-top: 2px; }
+  .stat-cell .sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+  details summary { cursor: pointer; font-size: 11px; color: var(--muted); padding: 4px 0; }
+  details summary:hover { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo">Q</div>
+    <div>
+      <h1>Agent Logs — Detail Drill-down</h1>
+      <div class="sub">Pipeline runs → Agent timeline → Per-agent payloads</div>
+    </div>
+  </div>
+  <div style="display:flex;gap:8px">
+    <a class="home" href="/logs">/logs</a>
+    <a class="home" href="/">← Console</a>
+  </div>
+</header>
+
+<main>
+
+  <!-- Filter bar -->
+  <div class="filter-bar">
+    <label>Workflow
+      <select id="fltWorkflow">
+        <option value="">All</option>
+        <option value="analysis_pipeline">Analysis (F2)</option>
+        <option value="discovery_pipeline">Discovery (F1)</option>
+      </select>
+    </label>
+    <label>Status
+      <select id="fltStatus">
+        <option value="">All</option>
+        <option value="STARTED">Started</option>
+        <option value="COMPLETED">Completed</option>
+        <option value="FAILED">Failed</option>
+      </select>
+    </label>
+    <label>Symbol
+      <input id="fltSymbol" type="text" placeholder="e.g. BRITANNIA" style="width:130px">
+    </label>
+    <label>Limit
+      <select id="fltLimit">
+        <option value="20">20</option>
+        <option value="50" selected>50</option>
+        <option value="100">100</option>
+      </select>
+    </label>
+    <button onclick="loadRuns()">↻ Refresh</button>
+    <button class="secondary" onclick="loadStats()">📊 24h Stats</button>
+    <span style="font-size:11px;color:var(--muted);margin-left:auto" id="lastUpdated">—</span>
+  </div>
+
+  <!-- Stats strip (optional, shown when /stats is loaded) -->
+  <div id="statsStrip"></div>
+
+  <!-- Two-pane layout -->
+  <div class="layout">
+    <!-- Left: run list -->
+    <div class="card" style="padding:10px">
+      <h3 style="padding:0 4px">Runs <span id="runCount" style="float:right;font-weight:400;color:var(--muted);text-transform:none">—</span></h3>
+      <div class="run-list" id="runList">
+        <div class="loading">Loading…</div>
+      </div>
+    </div>
+
+    <!-- Right: run detail -->
+    <div class="card" id="runDetail" style="padding:14px;min-height:300px">
+      <div class="empty">
+        ← Click a run on the left to see its agent timeline.<br>
+        Each agent in the run becomes an expandable card with input/output/prompt/raw response/reasoning.
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+  // ── Config ──────────────────────────────────────────────────────────────
+  // Resolved from /config.js (window.__API_BASE__, set by PUBLIC_API_BASE_URL).
+  // Blank → same origin (endpoints mounted under /api/agentlogs).
+  const API_BASE = (window.__API_BASE__ && window.__API_BASE__.trim())
+    ? window.__API_BASE__.replace(/\/$/, "")
+    : (window.location.origin.startsWith("file:") ? "http://localhost:8000" : "");
+  let _runs = [];
+  let _selectedRunId = null;
+
+  // ── Utils ───────────────────────────────────────────────────────────────
+  function escapeHtml(s) {
+    return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+  function fmtMs(ms) {
+    if (ms == null) return "—";
+    if (ms < 1000) return ms.toFixed(0) + "ms";
+    return (ms / 1000).toFixed(2) + "s";
+  }
+  function fmtUsd(v) { return v != null ? "$" + Number(v).toFixed(4) : "—"; }
+  function fmtTime(iso) {
+    if (!iso) return "—";
+    try { return new Date(iso).toLocaleString(); } catch { return iso; }
+  }
+  function fmtAgo(iso) {
+    if (!iso) return "—";
+    try {
+      const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+      if (diff < 60) return Math.round(diff) + "s ago";
+      if (diff < 3600) return Math.round(diff / 60) + "m ago";
+      if (diff < 86400) return Math.round(diff / 3600) + "h ago";
+      return Math.round(diff / 86400) + "d ago";
+    } catch { return iso; }
+  }
+
+  // ── Load run list ──────────────────────────────────────────────────────
+  async function loadRuns() {
+    const list = document.getElementById("runList");
+    list.innerHTML = `<div class="loading">Loading runs…</div>`;
+    const workflow = document.getElementById("fltWorkflow").value;
+    const status = document.getElementById("fltStatus").value;
+    const symbol = document.getElementById("fltSymbol").value.trim().toUpperCase();
+    const limit = document.getElementById("fltLimit").value;
+    const params = new URLSearchParams({ limit });
+    if (workflow) params.set("workflow", workflow);
+    if (status)   params.set("status", status);
+    if (symbol)   params.set("symbol", symbol);
+    try {
+      const r = await fetch(`${API_BASE}/api/agentlogs/runs?${params}`);
+      const j = await r.json();
+      _runs = j.runs || [];
+      document.getElementById("runCount").textContent = `${_runs.length} / ${j.total || 0}`;
+      document.getElementById("lastUpdated").textContent = "Updated: " + new Date().toLocaleTimeString();
+      renderRunList();
+    } catch (e) {
+      list.innerHTML = `<div class="err-box">Failed to load runs: ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  function renderRunList() {
+    const list = document.getElementById("runList");
+    if (!_runs.length) {
+      list.innerHTML = `<div class="empty">No runs match the current filters.</div>`;
+      return;
+    }
+    list.innerHTML = _runs.map(r => {
+      const wfLabel = (r.workflow_name || "—").replace("_pipeline", "");
+      const stat = (r.status || "—").toUpperCase();
+      const failedBadge = (r.failed_count || 0) > 0
+        ? `<span class="pill FAILED">${r.failed_count} failed</span>` : "";
+      const agentCount = r.agent_count != null ? r.agent_count : "—";
+      const elapsed = r.elapsed_sec != null ? r.elapsed_sec + "s" : (r.status === "STARTED" ? "in-flight" : "—");
+      const symPart = r.symbol ? ` · <b>${escapeHtml(r.symbol)}</b>` : "";
+      const isActive = r.id === _selectedRunId;
+      return `<div class="run-row ${isActive ? "active" : ""}" onclick="selectRun('${r.id}')">
+        <div class="top">
+          <div class="wf">${escapeHtml(wfLabel)}${symPart}</div>
+          <span class="pill ${stat}">${stat}</span>
+        </div>
+        <div class="meta">
+          <span><b>${agentCount}</b> agents</span>
+          <span><b>${elapsed}</b></span>
+          ${r.total_cost_usd != null ? `<span>cost <b>${fmtUsd(r.total_cost_usd)}</b></span>` : ""}
+          ${failedBadge}
+          <span style="margin-left:auto">${fmtAgo(r.started_at)}</span>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  // ── Load run detail ────────────────────────────────────────────────────
+  async function selectRun(runId) {
+    _selectedRunId = runId;
+    renderRunList();
+    const detail = document.getElementById("runDetail");
+    detail.innerHTML = `<div class="loading">Loading run detail…</div>`;
+    try {
+      const r = await fetch(`${API_BASE}/api/agentlogs/runs/${runId}`);
+      if (!r.ok) {
+        detail.innerHTML = `<div class="err-box">HTTP ${r.status}: ${escapeHtml(await r.text())}</div>`;
+        return;
+      }
+      const j = await r.json();
+      renderRunDetail(j);
+    } catch (e) {
+      detail.innerHTML = `<div class="err-box">Failed: ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  function renderRunDetail(j) {
+    const detail = document.getElementById("runDetail");
+    const run = j.run || {};
+    const agents = j.agents || [];
+    const rec = j.recommendation;
+    const symbol = j.symbol || "—";
+
+    const statsStrip = `
+      <div class="stats-strip">
+        <div class="stat-cell"><div class="label">Symbol</div><div class="value">${escapeHtml(symbol)}</div></div>
+        <div class="stat-cell"><div class="label">Workflow</div><div class="value" style="font-size:13px">${escapeHtml(run.workflow_name || "—")}</div></div>
+        <div class="stat-cell"><div class="label">Status</div><div class="value"><span class="pill ${run.status}">${run.status || "—"}</span></div></div>
+        <div class="stat-cell"><div class="label">Elapsed</div><div class="value">${run.elapsed_sec != null ? run.elapsed_sec + "s" : "—"}</div></div>
+        <div class="stat-cell"><div class="label">Agents</div><div class="value">${run.agent_count ?? agents.length}</div><div class="sub">${run.failed_count || 0} failed</div></div>
+        <div class="stat-cell"><div class="label">Total Cost</div><div class="value">${fmtUsd(run.total_cost_usd)}</div></div>
+        <div class="stat-cell"><div class="label">Tokens In/Out</div><div class="value" style="font-size:13px">${(run.total_tokens_in || 0).toLocaleString()} / ${(run.total_tokens_out || 0).toLocaleString()}</div></div>
+        ${j.discovery_count != null ? `<div class="stat-cell"><div class="label">Discovery Rows</div><div class="value">${j.discovery_count}</div></div>` : ""}
+      </div>`;
+
+    const recBox = rec ? `
+      <div class="card" style="margin-bottom:12px;background:var(--panel-2)">
+        <h3>Final Recommendation</h3>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:13px">
+          <span><b style="color:var(--text)"><span class="pill ${rec.recommendation}">${rec.recommendation || "—"}</span></b> @ ${rec.confidence != null ? Number(rec.confidence).toFixed(0) + "%" : "—"}</span>
+          <span style="color:var(--muted)">Horizon: <b style="color:var(--text)">${escapeHtml(rec.horizon || "—")}</b></span>
+          <span style="color:var(--muted)">Entry: <b style="color:var(--text)">₹${rec.entry_price ?? "—"}</b></span>
+          <span style="color:var(--muted)">Target: <b style="color:var(--buy)">₹${rec.target_price ?? "—"}</b></span>
+          <span style="color:var(--muted)">SL: <b style="color:var(--sell)">₹${rec.stop_loss ?? "—"}</b></span>
+          <span style="color:var(--muted)">Validator: <b style="color:var(--text)">${escapeHtml(rec.validator_status || "—")}</b></span>
+        </div>
+      </div>` : "";
+
+    const runErrBox = run.error ? `
+      <div class="err-box" style="margin-bottom:12px"><b>Run-level error:</b><br>${escapeHtml(run.error)}</div>` : "";
+
+    const agentCards = agents.length ? agents.map((a, idx) => renderAgentCard(a, idx)).join("") :
+      `<div class="empty">No agent_logs rows recorded for this run.</div>`;
+
+    detail.innerHTML = `
+      ${statsStrip}
+      ${recBox}
+      ${runErrBox}
+      <h3 style="font-size:13px;text-transform:uppercase;color:var(--muted);letter-spacing:.05em;margin:8px 0 10px">
+        Agent Timeline (${agents.length})
+        <span style="float:right;font-weight:400;text-transform:none;font-size:11px">click a row to expand</span>
+      </h3>
+      <div id="agentTimeline">${agentCards}</div>
+      <details style="margin-top:14px">
+        <summary>Raw workflow_config JSON</summary>
+        <pre>${escapeHtml(JSON.stringify(run.workflow_config || {}, null, 2))}</pre>
+      </details>
+    `;
+  }
+
+  function renderAgentCard(a, idx) {
+    const stat = (a.status || "—").toUpperCase();
+    const sig = a.signal ? `<span class="pill ${a.signal}">${a.signal}</span>` : "";
+    const conf = a.confidence != null
+      ? `${(a.confidence > 1 ? a.confidence : a.confidence * 100).toFixed(0)}%`
+      : "—";
+    const errBlurb = a.error ? `<div style="font-size:11px;color:var(--sell);margin-top:3px">${escapeHtml(a.error.slice(0, 200))}</div>` : "";
+    const capabilities = [
+      a.has_prompt && "prompt",
+      a.has_raw_response && "response",
+      a.has_input && "input",
+      a.has_output && "output",
+      a.has_reasoning && "reasoning",
+    ].filter(Boolean);
+    const capBadges = capabilities.length
+      ? `<span style="font-size:9px;color:var(--muted);margin-left:6px">${capabilities.join(" · ")}</span>` : "";
+
+    return `<div class="agent-card" id="agent-card-${a.id}">
+      <div class="top" onclick="toggleAgent('${a.id}')">
+        <div>
+          <div class="name">
+            <span style="color:var(--muted)">#${idx + 1}</span> ${escapeHtml(a.agent_name)}
+            <span class="type">${escapeHtml(a.agent_type || "")}</span>
+            ${capBadges}
+          </div>
+          <div style="margin-top:4px"><span class="pill ${stat}">${stat}</span> ${sig}</div>
+          ${errBlurb}
+        </div>
+        <div class="stats">
+          <span><b>${fmtMs(a.latency_ms)}</b></span>
+          <span>conf <b>${conf}</b></span>
+          ${a.model_used ? `<span style="font-family:monospace;font-size:10px">${escapeHtml(a.model_used.replace("gemini-2.5-", ""))}</span>` : ""}
+          ${a.cost_usd != null ? `<span>cost <b>${fmtUsd(a.cost_usd)}</b></span>` : ""}
+          ${(a.tokens_input || a.tokens_output) ? `<span>tok <b>${(a.tokens_input || 0)}/${(a.tokens_output || 0)}</b></span>` : ""}
+          ${a.retry_count ? `<span style="color:var(--hold)">↻ ${a.retry_count}</span>` : ""}
+        </div>
+      </div>
+      <div class="body" id="agent-body-${a.id}">
+        <div class="loading">Click to load full detail…</div>
+      </div>
+    </div>`;
+  }
+
+  // ── Agent expand: lazy-fetch the full payload ─────────────────────────
+  const _agentDetailCache = {};
+
+  async function toggleAgent(agentLogId) {
+    const card = document.getElementById(`agent-card-${agentLogId}`);
+    const body = document.getElementById(`agent-body-${agentLogId}`);
+    if (!card || !body) return;
+    if (card.classList.contains("open")) {
+      card.classList.remove("open");
+      return;
+    }
+    card.classList.add("open");
+
+    if (_agentDetailCache[agentLogId]) {
+      body.innerHTML = renderAgentBody(_agentDetailCache[agentLogId]);
+      return;
+    }
+    body.innerHTML = `<div class="loading">Loading payload…</div>`;
+    try {
+      const r = await fetch(`${API_BASE}/api/agentlogs/agents/${agentLogId}`);
+      if (!r.ok) {
+        body.innerHTML = `<div class="err-box">HTTP ${r.status}: ${escapeHtml(await r.text())}</div>`;
+        return;
+      }
+      const full = await r.json();
+      _agentDetailCache[agentLogId] = full;
+      body.innerHTML = renderAgentBody(full);
+    } catch (e) {
+      body.innerHTML = `<div class="err-box">Failed: ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  function renderAgentBody(a) {
+    const sections = [];
+    if (a.error) {
+      sections.push(`<h4>Error</h4><div class="err-box">${escapeHtml(a.error)}</div>`);
+    }
+    if (a.input) {
+      sections.push(`<h4>Input (whitelisted state snapshot)</h4>
+        <pre>${escapeHtml(JSON.stringify(a.input, null, 2))}</pre>`);
+    }
+    if (a.prompt_template) {
+      sections.push(`<h4>Rendered Prompt (sent to LLM)</h4>
+        <pre>${escapeHtml(a.prompt_template)}</pre>`);
+    }
+    if (a.raw_llm_response) {
+      sections.push(`<h4>Raw LLM Response</h4>
+        <pre>${escapeHtml(a.raw_llm_response)}</pre>`);
+    }
+    if (a.output) {
+      sections.push(`<h4>Output (parsed)</h4>
+        <pre>${escapeHtml(JSON.stringify(a.output, null, 2))}</pre>`);
+    }
+    if (a.reasoning) {
+      sections.push(`<h4>Reasoning / Thinking</h4>
+        <pre>${escapeHtml(JSON.stringify(a.reasoning, null, 2))}</pre>`);
+    }
+    if (!sections.length) {
+      return `<div class="empty">
+        No detailed payloads captured for this agent invocation.<br>
+        <span style="font-size:11px">(rich-capture only fires from LLM-heavy nodes: debate, discovery)</span>
+      </div>`;
+    }
+    return sections.join("");
+  }
+
+  // ── 24h stats strip ────────────────────────────────────────────────────
+  async function loadStats() {
+    const strip = document.getElementById("statsStrip");
+    strip.innerHTML = `<div class="loading">Loading 24h stats…</div>`;
+    try {
+      const r = await fetch(`${API_BASE}/api/agentlogs/stats?hours=24`);
+      const j = await r.json();
+      const agents = j.agents || [];
+      if (!agents.length) {
+        strip.innerHTML = `<div class="card empty">No agent_logs rows in last 24h.</div>`;
+        return;
+      }
+      strip.innerHTML = `
+        <div class="card">
+          <h3>24h Stats by Agent</h3>
+          <table style="width:100%;font-size:12px;border-collapse:collapse">
+            <thead><tr style="text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em">
+              <th style="padding:6px 8px">Agent</th>
+              <th style="padding:6px 8px">Type</th>
+              <th style="padding:6px 8px;text-align:right">Runs</th>
+              <th style="padding:6px 8px;text-align:right">Failures</th>
+              <th style="padding:6px 8px;text-align:right">Fail %</th>
+              <th style="padding:6px 8px;text-align:right">p50</th>
+              <th style="padding:6px 8px;text-align:right">p95</th>
+              <th style="padding:6px 8px;text-align:right">Avg Cost</th>
+              <th style="padding:6px 8px;text-align:right">Tokens (in/out)</th>
+            </tr></thead>
+            <tbody>
+              ${agents.map(a => `
+                <tr style="border-top:1px solid var(--border)">
+                  <td style="padding:6px 8px;font-weight:600">${escapeHtml(a.agent_name)}</td>
+                  <td style="padding:6px 8px;color:var(--muted);font-size:10px">${escapeHtml(a.agent_type || "")}</td>
+                  <td style="padding:6px 8px;text-align:right">${a.count}</td>
+                  <td style="padding:6px 8px;text-align:right;color:${a.failures > 0 ? "var(--sell)" : "var(--muted)"}">${a.failures}</td>
+                  <td style="padding:6px 8px;text-align:right;color:${a.failure_rate > 0.1 ? "var(--sell)" : (a.failure_rate > 0 ? "var(--hold)" : "var(--muted)")}">${(a.failure_rate * 100).toFixed(1)}%</td>
+                  <td style="padding:6px 8px;text-align:right">${fmtMs(a.p50_latency_ms)}</td>
+                  <td style="padding:6px 8px;text-align:right">${fmtMs(a.p95_latency_ms)}</td>
+                  <td style="padding:6px 8px;text-align:right">${fmtUsd(a.avg_cost_usd)}</td>
+                  <td style="padding:6px 8px;text-align:right;color:var(--muted);font-size:11px">${(a.total_tokens_in || 0).toLocaleString()} / ${(a.total_tokens_out || 0).toLocaleString()}</td>
+                </tr>`).join("")}
+            </tbody>
+          </table>
+        </div>`;
+    } catch (e) {
+      strip.innerHTML = `<div class="err-box">Stats load failed: ${escapeHtml(e.message)}</div>`;
+    }
+  }
+
+  // ── Init ────────────────────────────────────────────────────────────────
+  document.getElementById("fltWorkflow").onchange = loadRuns;
+  document.getElementById("fltStatus").onchange = loadRuns;
+  document.getElementById("fltLimit").onchange = loadRuns;
+  document.getElementById("fltSymbol").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") loadRuns();
+  });
+  loadRuns();
+</script>
+
+</body>
+</html>
