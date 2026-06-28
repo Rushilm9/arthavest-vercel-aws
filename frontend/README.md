@@ -53,14 +53,14 @@ The ArthaVest frontend is a **single-page application** that serves as the user-
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Configure environment
 cp .env.example .env
 # Set VITE_API_BASE_URL to your backend URL
 
 # Start dev server
-npm run dev
+pnpm run dev
 ```
 
 Open [http://localhost:5173](http://localhost:5173).
@@ -72,7 +72,7 @@ This project is configured for **zero-config Vercel deployment**:
 ```json
 {
   "framework": "vite",
-  "buildCommand": "npm run build",
+  "buildCommand": "pnpm run build",
   "outputDirectory": "dist",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }

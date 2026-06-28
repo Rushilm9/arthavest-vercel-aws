@@ -57,6 +57,13 @@ class Settings(BaseSettings):
     LLM_API_KEY_3: str = os.getenv("GOOGLE_API_KEY_3", "")
     LLM_MODEL_NAME: str = "gemini-3.1-flash-lite"
 
+    # AWS Bedrock Configuration
+    USE_BEDROCK: bool = os.getenv("USE_BEDROCK", "true").lower() in ("true", "1", "t")
+    AWS_ACCESS_KEY_ID: str = os.getenv("AWS_ACCESS_KEY_ID", "dummy_aws_access_key")
+    AWS_SECRET_ACCESS_KEY: str = os.getenv("AWS_SECRET_ACCESS_KEY", "dummy_aws_secret_key")
+    AWS_REGION: str = os.getenv("AWS_REGION", "us-east-1")
+    BEDROCK_MODEL_ID: str = os.getenv("BEDROCK_MODEL_ID", "anthropic.claude-3-5-sonnet-20241022-v2:0")
+
     # Public base URL the frontend should call. Blank = same origin as the
     # page (the normal case, since FastAPI serves the frontend itself).
     # Set only when the frontend is hosted on a different origin than the API.

@@ -1,5 +1,5 @@
 # ==============================================================
-# Quant AI - Python Dependencies (Trimmed for Vertex AI Deployed Graph)
+# Quant AI - Python Dependencies (Trimmed for AWS Bedrock & Aurora PostgreSQL)
 # Install:  pip install -r requirements.txt
 # Python:   3.11+
 # ==============================================================
@@ -16,19 +16,21 @@ requests>=2.31.0
 httpx>=0.27.0
 rich>=13.7.1
 
-# -- Database (Supabase / Postgres) ----------------
+# -- Database (Amazon Aurora PostgreSQL) ----------------
 sqlalchemy>=2.0.29
 psycopg2-binary>=2.9.9
 
 # -- Auth ------------------------------------------
 bcrypt>=4.0.0
 
-# -- AI / LLM (Google Gemini via LangChain) --------
+# -- AI / LLM (Amazon Bedrock & Google Gemini) --------
 langchain-google-genai>=2.0.0
 langchain-core>=0.3.0
 langgraph>=0.2.0
 langchain-google-vertexai>=1.0.0
 google-cloud-aiplatform[agent_engines]>=1.50.0
+langchain-aws>=0.1.0
+boto3>=1.34.0
 
 # -- Data processing -------------------------------
 pandas>=2.2.0

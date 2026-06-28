@@ -154,6 +154,25 @@ def _make_chat(model_id: str, json_mode: bool, extra: dict | None = None):
         if _TOKEN_COLLECTOR not in cbs:
             cbs.append(_TOKEN_COLLECTOR)
         extra["callbacks"] = cbs
+
+    if settings.USE_BEDROCK:
+        try:
+            from langchain_aws import ChatBedrock
+            
+            kwargs = {
+                "model_id": settings.BEDROCK_MODEL_ID,
+                "region_name": settings.AWS_REGION,
+                "aws_access_key_id": settings.AWS_ACCESS_KEY_ID,
+                "aws_secret_access_key": settings.AWS_SECRET_ACCESS_KEY,
+                "temperature": 0.0,
+                **extra,
+            }
+            # Claude expects system messages or different formatting, 
+            # Langchain handles basic chat translation.
+            return ChatBedrock(**kwargs)
+        except ImportError:
+            logger.warning("langchain_aws not installed, falling back to Gemini")
+
     if settings.USE_VERTEX:
         if not _VERTEX_AVAILABLE:
             raise RuntimeError(
