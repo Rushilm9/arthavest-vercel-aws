@@ -46,8 +46,8 @@ export function Login() {
 
   const handleTestCredentials = async () => {
     setError("");
-    const testEmail = "googl_arize_hack@gmail.com";
-    const testPassword = "arize_google@1";
+    const testEmail = "hack@zerostack.dev";
+    const testPassword = "zerostack";
     setEmail(testEmail);
     setPassword(testPassword);
 
