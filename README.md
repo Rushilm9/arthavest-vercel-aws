@@ -1,6 +1,6 @@
 <div align="center">
-  <img src="frontend/LOGO/ArthVest%20logo.png" width="140" alt="ArthaVest Logo" />
-  <h1>ArthaVest</h1>
+  <img src="frontend/LOGO/ArthVest%20logo.png" width="140" alt="Arthvest Logo" />
+  <h1>Arthvest</h1>
   <p><strong>An Aurora-backed AI investment-research platform with a fully reconstructable decision ledger.</strong></p>
   <p><em>Every recommendation — from agent signal to paper-trade P&L — is fully reconstructable from Amazon Aurora PostgreSQL.</em></p>
 
@@ -57,16 +57,16 @@ Without a fully reconstructable decision history, trust is impossible — and tr
 
 ## 🎯 Our Solution
 
-**ArthaVest** is an AI investment-research platform where **Amazon Aurora PostgreSQL is the single source of truth** for every decision ever made.
+**Arthvest** is an AI investment-research platform where **Amazon Aurora PostgreSQL is the single source of truth** for every decision ever made.
 
 Every recommendation flows through a multi-agent pipeline — 4 specialist agents vote, an adversarial debate engine stress-tests the consensus, a 3-layer validator gates the output — and **every step is persisted in Aurora** as a permanent, queryable audit trail.
 
 > **The core insight:** The AI generates the *content*; **Aurora PostgreSQL is the protagonist** — the system that makes every recommendation fully reconstructable.
 
-### What Makes ArthaVest Different
+### What Makes Arthvest Different
 
-| Feature | Traditional AI Tools | ArthaVest |
-|---------|---------------------|-----------|
+| Feature | Traditional AI Tools | Arthvest |
+|---------|---------------------|----------|
 | Decision transparency | Black-box output | Full agent-by-agent lineage stored in Aurora |
 | WAIT discipline | Always recommends a trade | Firm WAIT when data is weak or contradictory |
 | Audit trail | None | Every signal, debate, and validation in the DB |
@@ -77,25 +77,11 @@ Every recommendation flows through a multi-agent pipeline — 4 specialist agent
 
 ## 🏗️ Architecture
 
-```
-┌─────────────┐     HTTPS      ┌──────────────────┐     REST API     ┌──────────────────────┐     SQL/SSL     ┌─────────────────────────────┐
-│             │  ──────────►   │                  │  ──────────►    │                      │  ──────────►  │                             │
-│   Browser   │                │   ▲ Vercel       │                 │   AWS EC2            │               │  Amazon Aurora PostgreSQL   │
-│   React SPA │                │   React/Vite SPA │                 │   FastAPI Backend    │               │  Serverless v2 · us-east-1  │
-│             │  ◄──────────   │   CDN + Edge     │  ◄──────────    │   Multi-Agent Engine │  ◄──────────  │  19 tables · 706+ recs      │
-│             │                │                  │                 │   Python 3.12        │               │  sslmode=require            │
-└─────────────┘                └──────────────────┘                 └──────────────────────┘               └─────────────────────────────┘
-                                                                              │
-                                                                              │  API Call
-                                                                              ▼
-                                                                    ┌──────────────────┐
-                                                                    │  Amazon Bedrock  │
-                                                                    │  Claude 3.5      │
-                                                                    │  (LLM Engine)    │
-                                                                    └──────────────────┘
-```
-
-**Architecture Diagram:** [architecture.svg](docs/architecture.svg)
+<div align="center">
+  <img src="images/slide_6_architecture.png" alt="Arthvest Architecture — Browser → Vercel → AWS EC2 → Amazon Aurora PostgreSQL" width="800" />
+  <br /><br />
+  <img src="images/Arch2.png" alt="Arthvest Detailed Architecture — Data Flow, Aurora Schema & AI Agent Pipeline" width="800" />
+</div>
 
 ### Data Flow
 
@@ -205,7 +191,7 @@ We used **Vercel v0** to prototype the **Decision Audit Trail** interface — th
 
 ## 🧠 The AI Multi-Agent Pipeline
 
-ArthaVest uses a **LangGraph-orchestrated multi-agent pipeline** powered by **Amazon Bedrock (Claude 3.5 Sonnet & Haiku)**:
+Arthvest uses a **LangGraph-orchestrated multi-agent pipeline** powered by **Amazon Bedrock (Claude 3.5 Sonnet & Haiku)**:
 
 ```mermaid
 graph TD
@@ -242,7 +228,7 @@ A signal only becomes a real BUY or SELL after passing strict tests:
 
 ### The WAIT Discipline
 
-Unlike most AI trading tools, ArthaVest's default posture is **WAIT**. The pipeline is designed so that:
+Unlike most AI trading tools, Arthvest's default posture is **WAIT**. The pipeline is designed so that:
 - Weak or contradictory signals → WAIT
 - Failed validation → WAIT  
 - Low confidence after debate → WAIT
@@ -254,26 +240,64 @@ This is reflected in our Aurora data: **310 out of 706 recommendations are WAIT*
 
 ## 📸 App Screenshots
 
+### 🔐 Login Page
+Live on Vercel at `vercel-hack-nine.vercel.app` — secure authentication with session management.
+
+<div align="center">
+  <img src="images/Login_Page.png" alt="Arthvest Login Page" width="700" />
+</div>
+
+---
+
 ### 📊 Dashboard
-Live market indices, news feed, and portfolio overview.
+Live market indices, news feed, market breadth, and portfolio overview — all in real time.
+
+<div align="center">
+  <img src="images/Dashboard.png" alt="Arthvest Dashboard — Market Indices & News Feed" width="700" />
+</div>
+
+---
 
 ### 🔍 Stock Discovery
-Multi-factor screening for investment opportunities across Indian markets.
+AI-powered market analysis with Economic Context, Market Pulse, News Sentiment, and Macro Context scores. Filter stocks by Short Term, Medium Term, and Long Term horizons.
+
+<div align="center">
+  <img src="images/Discovery.png" alt="Arthvest Discovery — AI Market Analysis & Stock Screening" width="700" />
+</div>
+
+---
+
+### 📈 Deep Analysis Report
+Comprehensive multi-agent AI report with BUY/SELL/WAIT verdict, target prices, catalysts, risks, technical analysis, fundamental analysis, sentiment analysis, chart pattern detection, and consensus debate.
+
+<div align="center">
+  <img src="images/Analysis.png" alt="Arthvest Analysis — Multi-Agent AI Report" width="700" />
+</div>
+
+---
 
 ### 📜 Recommendation History
-Full ledger of every AI recommendation with filter and search — every row is an Aurora query.
+Full ledger of every AI recommendation with filters by symbol, verdict, date range, and horizon — every row is an Aurora query.
 
-### 🔎 Decision Audit Trail *(New — built for this hackathon)*
-The crown jewel: a timeline view reconstructing the complete decision lineage from Aurora PostgreSQL:
-- **Run** → **Agent Signals** (name, signal, confidence, latency) → **Debate** → **Validator** → **Paper Trade P&L**
-- Labeled: *"Reconstructed from Amazon Aurora PostgreSQL"*
+<div align="center">
+  <img src="images/History.png" alt="Arthvest History — Recommendation Ledger" width="700" />
+</div>
+
+---
+
+### 🔎 Decision Audit Trail *(Built for this hackathon)*
+The crown jewel: a timeline view reconstructing the complete decision lineage from Aurora PostgreSQL — Run → Agent Signals → Multi-Agent Debate → Validator Review → Final Recommendation. Labeled: *"Reconstructed from Amazon Aurora PostgreSQL"*.
+
+<div align="center">
+  <img src="images/Audit_Trail.png" alt="Arthvest Audit Trail — Full Decision Lineage from Aurora PostgreSQL" width="700" />
+</div>
 
 ---
 
 ## 🛠️ Tech Stack
 
 | Layer | Technology | Purpose |
-|-------|-----------|---------|
+|-------|-----------|---------| 
 | **Database** | Amazon Aurora PostgreSQL Serverless v2 | 19-table decision ledger with JSONB, FKs, check constraints |
 | **Frontend Hosting** | Vercel | Global CDN, edge delivery, SPA routing |
 | **Frontend Framework** | React 19 + Vite + TypeScript + Tailwind CSS | Fast, type-safe UI with responsive design |
@@ -321,6 +345,15 @@ vercel_aws_hack_arthvest/
 │   ├── requirements.txt        # Python dependencies
 │   ├── Dockerfile              # Multi-stage Docker build
 │   └── .env.example            # Environment variable template
+│
+├── images/                            # Screenshots & architecture
+│   ├── slide_6_architecture.png    # Architecture diagram
+│   ├── Login_Page.png              # Login page screenshot
+│   ├── Dashboard.png               # Dashboard screenshot
+│   ├── Discovery.png               # Discovery page screenshot
+│   ├── Analysis.png                # Deep analysis report screenshot
+│   ├── History.png                 # Recommendation history screenshot
+│   └── Audit_Trail.png            # Decision Audit Trail screenshot
 │
 └── README.md                          # ← You are here
 ```
@@ -424,7 +457,7 @@ MIT License. See [LICENSE](backend/LICENSE) for details.
 
 <div align="center">
   <br />
-  <p><strong>ArthaVest</strong> — Every AI decision, fully reconstructable from Amazon Aurora PostgreSQL.</p>
+  <p><strong>Arthvest</strong> — Every AI decision, fully reconstructable from Amazon Aurora PostgreSQL.</p>
   <p>
     <img src="https://img.shields.io/badge/Built%20for-H0%3A%20Hack%20the%20Zero%20Stack-B85A10?style=flat-square" alt="H0 Hackathon" />
     <img src="https://img.shields.io/badge/Database-Amazon%20Aurora%20PostgreSQL-FF9900?style=flat-square" alt="Aurora" />
