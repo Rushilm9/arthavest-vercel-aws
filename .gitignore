@@ -7,10 +7,14 @@ __pycache__/
 *.pyc
 *.pyo
 
-# Environment
+# Environment & Secrets
 .env
 .env.local
 .env.production
+*.pem
+*.key
+aws_secrets*
+*secrets*
 
 # Build outputs
 dist/
